@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageTags>MongoDB, GridFS</PackageTags>
+        <Title>Toolkit.Mongo</Title>
+        <Authors>Toolkit</Authors>
+        <Description>Extension for the framework MongoDB.Driver</Description>
+        <RepositoryUrl>https://github.com/orldev/Toolkit.Mongo</RepositoryUrl>
+        <Copyright>Toolkit, 2023</Copyright>
+        <PackageProjectUrl>https://github.com/orldev/Toolkit.Mongo</PackageProjectUrl>
+        <RepositoryType>GitHub</RepositoryType>
+    </PropertyGroup>
+    
+    
+    <ItemGroup>
+        <PackageReference Include="MongoDB.Driver" Version="2.19.2" />
+        <PackageReference Include="MongoDB.Driver.GridFS" Version="2.19.2" />
+    </ItemGroup>
+</Project>
