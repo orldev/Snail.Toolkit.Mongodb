@@ -1,0 +1,62 @@
+name: Automated Dependency Updates
+
+on:
+ schedule:
+   # At 10:00 on Tuesday in every month.
+   - cron:  '0 10 * */1 2'
+   
+jobs:
+  dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.PACKAGES }}
+          ref: ${{ github.ref_name }}
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        
+      - name: Setup dotnet-outdated-tool
+        id: tools
+        run: dotnet tool install --global dotnet-outdated-tool
+          
+      - name: Update
+        id: update
+        run: |
+          OUTPUT=$(dotnet outdated)
+          if [[ $OUTPUT =~ "No outdated dependencies were detected" ]]; then
+              echo "::set-output name=updated::false"
+          else
+              dotnet outdated -u
+
+              echo "::set-output name=updated::true"
+          fi
+        shell: bash
+
+      - name: Test
+        if: ${{ steps.update.outputs.updated == 'true' }}
+        run: dotnet test -c Release -v minimal
+
+      - name: Get next version
+        uses: reecetech/version-increment@2023.4.1
+        id: version
+        with:
+          scheme: semver
+          increment: patch
+
+      - name: Push
+        id: push
+        if: ${{ steps.update.outputs.updated == 'true' }}
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          branch: '${{ github.event.repository.default_branch }}'
+          commit_author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+          tagging_message: '${{ steps.version.outputs.v-version }}'
+          commit_message: Automated Dependency Updates
