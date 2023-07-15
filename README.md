@@ -5,6 +5,10 @@
 Connecting the configuration
 
 ```c# 
+builder.Services.AddMongo(builder.Configuration);
+```
+or 
+```c# 
 builder.Services.AddSingleton<IMongoService>(new MongoService(options =>
 {
     options.Connection = builder.Configuration["mongo:Connection"];

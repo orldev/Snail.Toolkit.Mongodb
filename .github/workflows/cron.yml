@@ -2,8 +2,8 @@ name: Automated Dependency Updates
 
 on:
  schedule:
-   # At 10:00 on Tuesday in every month.
-   - cron:  '0 10 * */1 2'
+   # At 10:00 AM, on day 2 of the month
+   - cron:  '0 10 2 */1 *'
    
 jobs:
   dependencies:

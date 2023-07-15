@@ -29,6 +29,16 @@ public class MongoService: IMongoService
     /// <summary>
     /// Enter description here
     /// </summary>
+    /// <param name="options"></param>
+    public MongoService(MongoOptions options)
+    {
+        MongoClient client = new(options.Connection);
+        _database = client.GetDatabase(options.Database);
+    }
+    
+    /// <summary>
+    /// Enter description here
+    /// </summary>
     public IGridFSBucket GridFs => new GridFSBucket(_database);
     
     /// <summary>
