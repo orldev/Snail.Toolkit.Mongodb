@@ -1,8 +1,8 @@
 ## MongoDB
 
-#### Extension for the framework `MongoDB.Driver`
+Extension for the framework `MongoDB.Driver`
 
-Connecting the configuration
+#### Connecting the configuration
 
 ```c# 
 builder.Services.AddMongo(builder.Configuration);

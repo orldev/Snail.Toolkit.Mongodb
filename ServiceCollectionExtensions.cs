@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Toolkit.Mongo;
 
-public static class MongoExtensions
+public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddMongo(this IServiceCollection services, IConfiguration configuration)
     {
