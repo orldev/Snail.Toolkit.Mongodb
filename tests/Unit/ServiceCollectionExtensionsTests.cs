@@ -210,6 +210,65 @@ public class ServiceCollectionExtensionsTests
         Assert.Contains(nameof(MongoOptions.Database), exception.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// [Required] only asks whether the string is there. A connection string the driver cannot parse
+    /// is present and unusable, so the host came up and the first query — possibly minutes later,
+    /// possibly in production — was the one to find out.
+    /// </summary>
+    [Fact]
+    public async Task AddMongodb_WhenTheConnectionStringCannotBeParsed_FailsStartup()
+    {
+        var configuration = Given.Configuration(new Dictionary<string, string>
+        {
+            { $"{Given.Section}:Connection", "this is not a connection string" },
+            { $"{Given.Section}:Database", Given.DatabaseName }
+        });
+
+        using var host = Host(configuration);
+
+        await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
+    }
+
+    /// <summary>
+    /// The same hole one property along: MongoDB rejects a database name containing a dot, and the
+    /// rejection arrived from GetDatabase at first resolve rather than from validation at start-up.
+    /// </summary>
+    [Fact]
+    public async Task AddMongodb_WhenTheDatabaseNameIsIllegal_FailsStartup()
+    {
+        var configuration = Given.Configuration(new Dictionary<string, string>
+        {
+            { $"{Given.Section}:Connection", Given.Connection },
+            { $"{Given.Section}:Database", "has.dots" }
+        });
+
+        using var host = Host(configuration);
+
+        await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
+    }
+
+    /// <summary>
+    /// The three registrations are singletons resolved lazily, so the first burst of traffic after a
+    /// cold start is where a broken factory would show up.
+    /// </summary>
+    [Fact]
+    public void Resolving_FromManyThreadsAtOnce_YieldsOneClient()
+    {
+        using var provider = Provider();
+
+        var clients = new System.Collections.Concurrent.ConcurrentBag<IMongoClient>();
+        var databases = new System.Collections.Concurrent.ConcurrentBag<IMongoDatabase>();
+
+        Parallel.For(0, 64, _ =>
+        {
+            clients.Add(provider.GetRequiredService<IMongoClient>());
+            databases.Add(provider.GetRequiredService<IMongoDatabase>());
+        });
+
+        Assert.Single(clients.Distinct());
+        Assert.Single(databases.Distinct());
+    }
+
     [Fact]
     public async Task AddMongo_WithCompleteSettings_StartsUp()
     {

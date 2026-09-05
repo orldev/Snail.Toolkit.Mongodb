@@ -12,12 +12,18 @@ namespace Snail.Toolkit.Mongodb.Tests.Integration;
 public sealed class MongoContainerFixture : IAsyncLifetime
 {
     private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:8.0").Build();
+    private IMongoClient? _client;
 
     public string Connection => _container.GetConnectionString();
 
     public Task InitializeAsync() => _container.StartAsync();
 
-    public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+    public async Task DisposeAsync()
+    {
+        _client?.Dispose();
+
+        await _container.DisposeAsync();
+    }
 
     /// <summary>
     /// A database name unique to the calling test.
@@ -25,11 +31,20 @@ public sealed class MongoContainerFixture : IAsyncLifetime
     public static string NewDatabaseName() => $"test_{Guid.NewGuid():N}";
 
     /// <summary>
-    /// A database of its own, on a client the test owns.
+    /// A database of its own, off the client this fixture owns.
     /// </summary>
+    /// <remarks>
+    /// Every call used to build its own client, so a suite of sixty tests left sixty connection
+    /// pools and their monitoring threads behind — measured at twelve extra threads for sixty
+    /// connected clients. Settings that shape the client still need one of their own.
+    /// </remarks>
     public IMongoDatabase CreateDatabase(MongoSetup? setup = null) =>
-        Mongo.Database(
-            new MongoOptions { Connection = Connection, Database = NewDatabaseName() }, setup);
+        setup is null
+            ? Client().GetDatabase(NewDatabaseName())
+            : Mongo.Database(new MongoOptions { Connection = Connection, Database = NewDatabaseName() }, setup);
+
+    private IMongoClient Client() =>
+        _client ??= Mongo.Client(new MongoOptions { Connection = Connection, Database = NewDatabaseName() });
 
     public IGridFSBucket CreateGridFs(MongoSetup? setup = null) =>
         Mongo.GridFs(CreateDatabase(setup), setup);

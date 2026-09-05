@@ -8,6 +8,11 @@ public class MongoNamingTests
 
     private sealed record Pair<TFirst, TSecond>;
 
+    private sealed class Catalogue<T>
+    {
+        internal sealed record Entry;
+    }
+
     [Fact]
     public void ForType_UsesTheTypeName()
     {
@@ -42,18 +47,49 @@ public class MongoNamingTests
     }
 
     /// <summary>
+    /// A type nested inside a generic one reports <c>IsGenericType</c> true while its own name
+    /// carries no arity marker, so slicing at the backtick sliced at -1 and threw. Two such types
+    /// under different arguments must also not collapse onto one collection name, or documents of
+    /// two shapes end up in the same collection.
+    /// </summary>
+    [Fact]
+    public void ForType_WhenNestedInAGenericType_NamesItAfterTheArguments()
+    {
+        Assert.Equal("EntryOfOrder", MongoNaming.ForType(typeof(Catalogue<Order>.Entry)));
+
+        Assert.NotEqual(
+            MongoNaming.ForType(typeof(Catalogue<Order>.Entry)),
+            MongoNaming.ForType(typeof(Catalogue<Page<Order>>.Entry)));
+    }
+
+    /// <summary>
     /// The convention is process-wide. As a settable property two components could each set it and
     /// the second won silently, so which collection a type mapped to depended on module
     /// initialisation order. The value chosen here is the default itself, so the assertion costs
     /// the rest of the suite nothing.
     /// </summary>
     [Fact]
-    public void Use_ChoosesTheConventionOnceAndRefusesASecondTime()
+    public void Use_UnderParallelCallers_AcceptsExactlyOne()
     {
-        MongoNaming.Use(MongoNaming.ForType);
+        var accepted = 0;
+        var refused = 0;
 
+        Parallel.For(0, 64, _ =>
+        {
+            try
+            {
+                MongoNaming.Use(MongoNaming.ForType);
+                Interlocked.Increment(ref accepted);
+            }
+            catch (InvalidOperationException)
+            {
+                Interlocked.Increment(ref refused);
+            }
+        });
+
+        Assert.Equal(1, accepted);
+        Assert.Equal(63, refused);
         Assert.Equal("Order", MongoNaming.Default(typeof(Order)));
-        Assert.Throws<InvalidOperationException>(() => MongoNaming.Use(type => type.Name));
     }
 
     [Fact]

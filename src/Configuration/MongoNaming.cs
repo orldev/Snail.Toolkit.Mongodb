@@ -49,6 +49,13 @@ public static class MongoNaming
     /// Uses the type name, unwrapping generics into a readable form so that <c>Page&lt;Order&gt;</c>
     /// becomes <c>PageOfOrder</c> rather than the CLR's <c>Page`1</c>.
     /// </summary>
+    /// <remarks>
+    /// A type nested inside a generic one is itself generic and inherits the arguments, yet its name
+    /// carries no arity marker: <c>Catalogue&lt;Order&gt;.Entry</c> is named <c>Entry</c>, and
+    /// slicing at a backtick that is not there threw. The arguments still belong in the name, or
+    /// <c>Catalogue&lt;Order&gt;.Entry</c> and <c>Catalogue&lt;User&gt;.Entry</c> would share one
+    /// collection.
+    /// </remarks>
     /// <param name="type">The document type.</param>
     /// <returns>The collection name.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="type"/> is null.</exception>
@@ -59,7 +66,8 @@ public static class MongoNaming
         if (!type.IsGenericType)
             return type.Name;
 
-        var name = type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)];
+        var arity = type.Name.IndexOf('`', StringComparison.Ordinal);
+        var name = arity < 0 ? type.Name : type.Name[..arity];
         var arguments = type.GetGenericArguments().Select(ForType);
 
         return $"{name}Of{string.Join("And", arguments)}";

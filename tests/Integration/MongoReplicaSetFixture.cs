@@ -14,20 +14,33 @@ public sealed class MongoReplicaSetFixture : IAsyncLifetime
         .WithReplicaSet("rs0")
         .Build();
 
+    private IMongoClient? _client;
+
     public string Connection => _container.GetConnectionString();
 
     public Task InitializeAsync() => _container.StartAsync();
 
-    public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+    public async Task DisposeAsync()
+    {
+        _client?.Dispose();
+
+        await _container.DisposeAsync();
+    }
 
     public IMongoDatabase CreateDatabase(MongoSetup? setup = null) =>
-        Mongo.Database(
-            new MongoOptions
-            {
-                Connection = Connection,
-                Database = MongoContainerFixture.NewDatabaseName()
-            },
-            setup);
+        setup is null
+            ? Client().GetDatabase(MongoContainerFixture.NewDatabaseName())
+            : Mongo.Database(
+                new MongoOptions
+                {
+                    Connection = Connection,
+                    Database = MongoContainerFixture.NewDatabaseName()
+                },
+                setup);
+
+    private IMongoClient Client() =>
+        _client ??= Mongo.Client(
+            new MongoOptions { Connection = Connection, Database = MongoContainerFixture.NewDatabaseName() });
 }
 
 [CollectionDefinition(Name)]

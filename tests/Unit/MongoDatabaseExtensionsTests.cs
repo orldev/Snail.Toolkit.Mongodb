@@ -78,6 +78,85 @@ public class MongoDatabaseExtensionsTests
         Assert.Equal(WriteConcern.WMajority, collection.Settings.WriteConcern);
     }
 
+    /// <summary>
+    /// The naming convention is caller-supplied, so it can return anything. When it returned nothing
+    /// the driver complained about a parameter called "name" that this caller never passed — the
+    /// convention is the thing to fix, and the message has to say so.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void GetCollection_WhenTheConventionYieldsNothing_ThrowsNamingTheConvention(string produced)
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => Database().GetCollection<BsonDocument>(naming: _ => produced));
+
+        Assert.Equal("naming", exception.ParamName);
+    }
+
+    [Fact]
+    public void GetCollection_WhenTheConventionYieldsNull_ThrowsNamingTheConvention()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => Database().GetCollection<BsonDocument>(naming: _ => null!));
+
+        Assert.Equal("naming", exception.ParamName);
+    }
+
+    /// <summary>
+    /// The pack lands in the driver's process-global registry, which has no upsert: a second
+    /// registration of the same name stacks a duplicate rather than replacing it.
+    /// </summary>
+    [Fact]
+    public void ApplyConventions_UnderParallelCallers_RegistersThePackOnce()
+    {
+        var packName = $"test-{Guid.NewGuid():N}";
+        var before = CamelCasingConventions();
+
+        try
+        {
+            Parallel.For(0, 64, _ => Mongo.ApplyConventions(new MongoSetup
+            {
+                ConventionPackName = packName,
+                Conventions = pack => pack.Add(new CamelCaseElementNameConvention())
+            }));
+
+            Assert.Equal(before + 1, CamelCasingConventions());
+        }
+        finally
+        {
+            ConventionRegistry.Remove(packName);
+        }
+    }
+
+    /// <summary>
+    /// A server that is not there must surface as a failure, never as an empty result: an
+    /// aggregation that quietly returns nothing would read as "no matching documents".
+    /// </summary>
+    [Fact]
+    public async Task AggregateToListAsync_WhenTheServerIsUnreachable_Throws()
+    {
+        var pipeline = new BsonDocument[] { new("$match", new BsonDocument()) };
+
+        var exception = await Record.ExceptionAsync(
+            () => Given.Database(Given.UnreachableConnection).AggregateToListAsync(pipeline, "orders"));
+
+        Assert.NotNull(exception);
+    }
+
+    [Fact]
+    public async Task AggregateToListAsync_WithACancelledToken_DoesNotReachTheServer()
+    {
+        var pipeline = new BsonDocument[] { new("$match", new BsonDocument()) };
+
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => Given.Database(Given.UnreachableConnection)
+                .AggregateToListAsync(pipeline, "orders", cancellationToken: cancellation.Token));
+    }
+
     [Fact]
     public void GetCollection_WhenDatabaseIsNull_ThrowsArgumentNullException()
     {

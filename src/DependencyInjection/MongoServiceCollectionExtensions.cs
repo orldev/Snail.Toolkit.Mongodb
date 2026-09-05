@@ -190,7 +190,15 @@ public static class MongoServiceCollectionExtensions
 
         var options = services.AddOptions<MongoOptions>(OptionsName(serviceKey));
         configureOptions(options);
-        options.ValidateOnStart();
+
+        options
+            .Validate(
+                o => string.IsNullOrWhiteSpace(o.Connection) || CanParse(o.Connection),
+                "Connection is not a connection string the MongoDB driver can parse.")
+            .Validate(
+                o => string.IsNullOrWhiteSpace(o.Database) || DatabaseNamespace.IsValid(o.Database),
+                "Database is not a legal MongoDB database name: it must not contain '.' or a null character.")
+            .ValidateOnStart();
 
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<MongoOptions>>(MongoOptionsValidator.Instance));
@@ -242,6 +250,29 @@ public static class MongoServiceCollectionExtensions
 
     private static string Key(string? serviceKey) =>
         serviceKey is null ? string.Empty : $" under key '{serviceKey}'";
+
+    /// <summary>
+    /// Whether the driver can make a connection string of this.
+    /// </summary>
+    /// <remarks>
+    /// <c>[Required]</c> only asks whether the string is there. A present but unparseable one passed
+    /// validation, brought the host up, and surfaced from the first query instead — which is exactly
+    /// what validating at start-up is supposed to prevent. The driver exposes no non-throwing parse,
+    /// so this is the only way to ask.
+    /// </remarks>
+    private static bool CanParse(string connection)
+    {
+        try
+        {
+            MongoClientSettings.FromConnectionString(connection);
+
+            return true;
+        }
+        catch (MongoConfigurationException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// The settings as the caller configured them, needed before the container can build them.

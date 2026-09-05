@@ -22,6 +22,10 @@ public static class MongoDatabaseExtensions
     ///
     /// <paramref name="settings"/> is here so that taking the naming convention does not cost the
     /// per-collection write concern the driver's own overload offers.
+    ///
+    /// A convention is caller-supplied and can return anything. When it returned nothing the driver
+    /// complained about a parameter named <c>name</c> that this caller never passed, so an empty
+    /// result is refused here instead, against the parameter that produced it.
     /// </remarks>
     /// <param name="database">The database.</param>
     /// <param name="name">The collection name. When null or empty, <paramref name="naming"/> supplies it.</param>
@@ -41,11 +45,16 @@ public static class MongoDatabaseExtensions
     {
         ArgumentNullException.ThrowIfNull(database);
 
-        return database.GetCollection<T>(
-            string.IsNullOrEmpty(name)
-                ? (naming ?? MongoNaming.Default).Invoke(typeof(T))
-                : name,
-            settings);
+        if (string.IsNullOrEmpty(name) is false)
+            return database.GetCollection<T>(name, settings);
+
+        var resolved = (naming ?? MongoNaming.Default).Invoke(typeof(T));
+
+        if (string.IsNullOrWhiteSpace(resolved))
+            throw new ArgumentException(
+                $"The naming convention produced no collection name for '{typeof(T).Name}'.", nameof(naming));
+
+        return database.GetCollection<T>(resolved, settings);
     }
 
     /// <summary>

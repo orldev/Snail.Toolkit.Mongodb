@@ -255,13 +255,20 @@ public class MongoDatabaseIntegrationTests(MongoContainerFixture fixture)
     }
 
     /// <summary>
-    /// Ownership is unambiguous now: whoever built the client owns it. Under DI that is the
-    /// container, which is covered in <c>ServiceCollectionIntegrationTests</c>.
+    /// Ownership is unambiguous: whoever built the client owns it. Under DI that is the container,
+    /// which is covered in <c>ServiceCollectionIntegrationTests</c>. This one builds its own rather
+    /// than borrowing the fixture's, because disposing a borrowed client takes the rest of the
+    /// collection down with it — which is how this test was found.
     /// </summary>
     [Fact]
     public async Task DisposingTheClient_StopsTheDatabaseWorking()
     {
-        var db = fixture.CreateDatabase();
+        var db = Mongo.Database(new MongoOptions
+        {
+            Connection = fixture.Connection,
+            Database = MongoContainerFixture.NewDatabaseName()
+        });
+
         await db.GetCollection<Order>().InsertOneAsync(new Order { Product = "book" });
 
         (db.Client as IDisposable)?.Dispose();

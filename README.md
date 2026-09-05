@@ -64,9 +64,10 @@ builder.Services.Configure<MongoOptions>(o => o.Database = "tenant-42");
 
 Validation is generated from the data annotations on `MongoOptions` — no reflection at run time — and
 runs at host startup via `ValidateOnStart`. A missing setting refuses to bring the process up, with a
-message naming the property, rather than surfacing on the first query. `ValidateOnStart` needs a host
-to run in: outside one — a bare `ServiceCollection`, a console app — the same failure surfaces on the
-first resolve instead.
+message naming the property, rather than surfacing on the first query. A connection string the driver
+cannot parse and a database name MongoDB will not accept are refused there too: present is not the
+same as usable. `ValidateOnStart` needs a host to run in — outside one, a bare `ServiceCollection` or
+a console app, the same failure surfaces on the first resolve instead.
 
 Anything configuration cannot carry — delegates and driver option objects — goes in `setup`:
 
