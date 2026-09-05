@@ -40,6 +40,27 @@ public class MongoNamingTests
     {
         Assert.Equal(MongoNaming.ForType(typeof(Order)), MongoNaming.Default(typeof(Order)));
     }
+
+    /// <summary>
+    /// The convention is process-wide. As a settable property two components could each set it and
+    /// the second won silently, so which collection a type mapped to depended on module
+    /// initialisation order. The value chosen here is the default itself, so the assertion costs
+    /// the rest of the suite nothing.
+    /// </summary>
+    [Fact]
+    public void Use_ChoosesTheConventionOnceAndRefusesASecondTime()
+    {
+        MongoNaming.Use(MongoNaming.ForType);
+
+        Assert.Equal("Order", MongoNaming.Default(typeof(Order)));
+        Assert.Throws<InvalidOperationException>(() => MongoNaming.Use(type => type.Name));
+    }
+
+    [Fact]
+    public void Use_WithNull_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => MongoNaming.Use(null!));
+    }
 }
 
 public class MongoSetupTests

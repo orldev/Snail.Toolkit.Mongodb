@@ -1,17 +1,21 @@
 using Microsoft.Extensions.Options;
 
-namespace Snail.Toolkit.Mongodb.Services;
+namespace Snail.Toolkit.Mongodb;
 
 /// <summary>
-/// Builds the driver's types from settings. Used by the DI registration, and usable directly in a
-/// console app or a test where there is no container.
+/// The driver's types, built from settings.
 /// </summary>
-public static class MongoFactory
+/// <remarks>
+/// Used by the DI registration, and usable directly in a console app, a migration or a test where
+/// there is no container.
+/// </remarks>
+public static class Mongo
 {
     private static readonly Lock ConventionGate = new();
+    private static readonly HashSet<string> AppliedPacks = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// Creates a client from the given settings.
+    /// A client for the given settings.
     /// </summary>
     /// <remarks>
     /// The caller owns the returned client and its connection pool, and should keep one per
@@ -22,7 +26,7 @@ public static class MongoFactory
     /// <returns>A client.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is null.</exception>
     /// <exception cref="OptionsValidationException">The settings are incomplete.</exception>
-    public static IMongoClient CreateClient(MongoOptions options, MongoSetup? setup = null)
+    public static IMongoClient Client(MongoOptions options, MongoSetup? setup = null)
     {
         MongoOptionsValidator.ThrowIfInvalid(options, nameof(MongoOptions));
 
@@ -36,7 +40,7 @@ public static class MongoFactory
     }
 
     /// <summary>
-    /// Creates a client and returns the configured database off it.
+    /// The configured database, off a client built for the given settings.
     /// </summary>
     /// <remarks>
     /// The client behind the database is owned by the caller through
@@ -47,17 +51,17 @@ public static class MongoFactory
     /// <returns>A database.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is null.</exception>
     /// <exception cref="OptionsValidationException">The settings are incomplete.</exception>
-    public static IMongoDatabase CreateDatabase(MongoOptions options, MongoSetup? setup = null) =>
-        CreateClient(options, setup).GetDatabase(options.Database);
+    public static IMongoDatabase Database(MongoOptions options, MongoSetup? setup = null) =>
+        Client(options, setup).GetDatabase(options.Database);
 
     /// <summary>
-    /// Creates a GridFS bucket over the given database.
+    /// A GridFS bucket over the given database.
     /// </summary>
     /// <param name="database">The database.</param>
     /// <param name="setup">Supplies the bucket options, if any.</param>
     /// <returns>A bucket.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="database"/> is null.</exception>
-    public static IGridFSBucket CreateGridFsBucket(IMongoDatabase database, MongoSetup? setup = null)
+    public static IGridFSBucket GridFs(IMongoDatabase database, MongoSetup? setup = null)
     {
         ArgumentNullException.ThrowIfNull(database);
 
@@ -65,11 +69,26 @@ public static class MongoFactory
     }
 
     /// <summary>
-    /// Registers the configured conventions. The driver's registry is process-global and has no
-    /// upsert, so the pack is removed first to keep repeated creation idempotent.
+    /// Registers the configured conventions in the driver's process-global registry, once per name.
     /// </summary>
-    private static void ApplyConventions(MongoSetup setup)
+    /// <remarks>
+    /// A convention only reaches a type whose class map has not been built yet, and a class map stays
+    /// frozen for the life of the process. Applying conventions when the client is first resolved was
+    /// therefore a race against whatever serialised first: a type touched by a warm-up or a background
+    /// job kept its unconverted element names, so the same code wrote <c>UserName</c> in one process
+    /// and <c>userName</c> in the next. The registration path calls this while the container is still
+    /// being built, before anything can serialise.
+    ///
+    /// The registry has no upsert, and removing the pack before re-adding it left a window in which a
+    /// concurrent class map was built without the pack and stayed that way. Registering once per name
+    /// and skipping afterwards closes that window; the first registration of a name wins.
+    /// </remarks>
+    /// <param name="setup">Supplies the conventions and the name to register them under.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="setup"/> is null.</exception>
+    public static void ApplyConventions(MongoSetup setup)
     {
+        ArgumentNullException.ThrowIfNull(setup);
+
         if (setup.Conventions is null) return;
 
         ArgumentException.ThrowIfNullOrWhiteSpace(setup.ConventionPackName);
@@ -81,7 +100,8 @@ public static class MongoFactory
 
         lock (ConventionGate)
         {
-            ConventionRegistry.Remove(setup.ConventionPackName);
+            if (AppliedPacks.Add(setup.ConventionPackName) is false) return;
+
             ConventionRegistry.Register(setup.ConventionPackName, pack, _ => true);
         }
     }

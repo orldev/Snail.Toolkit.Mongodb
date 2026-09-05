@@ -21,7 +21,7 @@ public sealed class MongoReplicaSetFixture : IAsyncLifetime
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 
     public IMongoDatabase CreateDatabase(MongoSetup? setup = null) =>
-        MongoFactory.CreateDatabase(
+        Mongo.Database(
             new MongoOptions
             {
                 Connection = Connection,

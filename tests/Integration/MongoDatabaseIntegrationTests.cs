@@ -241,7 +241,7 @@ public class MongoDatabaseIntegrationTests(MongoContainerFixture fixture)
             new CreateIndexModel<Order>(Builders<Order>.IndexKeys.Ascending(x => x.Product)));
 
         var indexes = await (await collection.Indexes.ListAsync()).ToListAsync();
-        Assert.Contains(indexes, i => i["name"].AsString.StartsWith("Product"));
+        Assert.Contains(indexes, i => i["name"].AsString.StartsWith("Product", StringComparison.Ordinal));
     }
 
     [Fact]

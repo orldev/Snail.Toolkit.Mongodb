@@ -12,10 +12,10 @@ public static class MongoHealthChecksBuilderExtensions
     /// <summary>
     /// The name the check is registered under when none is given.
     /// </summary>
-    public const string DefaultName = "mongodb";
+    public const string DefaultName = "Mongodb";
 
     /// <summary>
-    /// Adds a check that pings the <see cref="IMongoDatabase"/> registered by <c>AddMongo</c>.
+    /// Adds a check over the <see cref="IMongoDatabase"/> registered by <c>AddMongodb</c>.
     /// </summary>
     /// <param name="builder">The health checks builder.</param>
     /// <param name="name">The name of the check.</param>
@@ -32,11 +32,11 @@ public static class MongoHealthChecksBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        return builder.AddCheck<MongoHealthCheck>(name, failureStatus, tags);
+        return builder.Add(Registration(name, serviceKey: null, failureStatus, tags));
     }
 
     /// <summary>
-    /// Adds a check that pings a keyed <see cref="IMongoDatabase"/> registered by <c>AddKeyedMongo</c>.
+    /// Adds a check over a keyed <see cref="IMongoDatabase"/> registered by <c>AddKeyedMongodb</c>.
     /// </summary>
     /// <param name="builder">The health checks builder.</param>
     /// <param name="serviceKey">The key the database was registered under.</param>
@@ -55,10 +55,26 @@ public static class MongoHealthChecksBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceKey);
 
-        return builder.Add(new HealthCheckRegistration(
-            name ?? serviceKey,
-            sp => new MongoHealthCheck(sp.GetRequiredKeyedService<IMongoDatabase>(serviceKey)),
-            failureStatus,
-            tags));
+        return builder.Add(Registration(name ?? serviceKey, serviceKey, failureStatus, tags));
+    }
+
+    /// <summary>
+    /// Resolves the database when the check runs rather than when it is added, so the two can be
+    /// registered in either order.
+    /// </summary>
+    private static HealthCheckRegistration Registration(
+        string name,
+        string? serviceKey,
+        HealthStatus? failureStatus,
+        string[] tags) =>
+        new(name, provider => Check(provider, serviceKey), failureStatus, tags);
+
+    private static IHealthCheck Check(IServiceProvider provider, string? serviceKey)
+    {
+        var database = serviceKey is null
+            ? provider.GetService<IMongoDatabase>()
+            : provider.GetKeyedService<IMongoDatabase>(serviceKey);
+
+        return database is null ? new MongoUnregistered(serviceKey) : new MongoHealthCheck(database);
     }
 }

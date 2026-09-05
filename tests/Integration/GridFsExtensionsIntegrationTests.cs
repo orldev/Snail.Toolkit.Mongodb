@@ -6,7 +6,7 @@ using MongoDB.Driver.GridFS;
 namespace Snail.Toolkit.Mongodb.Tests.Integration;
 
 [Collection(MongoContainerCollection.Name)]
-public class GridFSExtensionsIntegrationTests(MongoContainerFixture fixture)
+public class GridFsExtensionsIntegrationTests(MongoContainerFixture fixture)
 {
     private static readonly byte[] Content = "hello gridfs"u8.ToArray();
 

@@ -2,15 +2,14 @@ global using Xunit;
 using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
 using Snail.Toolkit.Mongodb.Configuration;
-using Snail.Toolkit.Mongodb.Services;
 
 namespace Snail.Toolkit.Mongodb.Tests;
 
-public static class Helper
+public static class Given
 {
     public const string Section = "mongodb";
     public const string Connection = "mongodb://username:password@localhost:27017";
-    public const string Database = "test";
+    public const string DatabaseName = "test";
 
     /// <summary>
     /// Points at a closed port with short timeouts, so operations fail quickly. Used to prove that
@@ -22,12 +21,12 @@ public static class Helper
     public static readonly Dictionary<string, string> InMemorySettings = new()
     {
         { $"{Section}:Connection", Connection },
-        { $"{Section}:Database", Database }
+        { $"{Section}:Database", DatabaseName }
     };
 
-    public static IConfiguration GetConfiguration() => GetConfiguration(InMemorySettings);
+    public static IConfiguration Configuration() => Configuration(InMemorySettings);
 
-    public static IConfiguration GetConfiguration(Dictionary<string, string> settings) =>
+    public static IConfiguration Configuration(Dictionary<string, string> settings) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(settings!)
             .Build();
@@ -35,10 +34,10 @@ public static class Helper
     /// <summary>
     /// A database over a client that opens no connections until something is asked of it.
     /// </summary>
-    public static IMongoDatabase Db(
+    public static IMongoDatabase Database(
         string connection = Connection,
-        string database = Database,
+        string database = DatabaseName,
         MongoSetup? setup = null) =>
-        MongoFactory.CreateDatabase(
+        Mongo.Database(
             new MongoOptions { Connection = connection, Database = database }, setup);
 }

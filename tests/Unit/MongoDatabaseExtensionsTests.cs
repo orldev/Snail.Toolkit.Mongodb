@@ -1,12 +1,13 @@
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 
 namespace Snail.Toolkit.Mongodb.Tests.Unit;
 
 /// <summary>
 /// The helpers hang off the driver's own types, so they work on a database or client obtained any way
-/// at all — from DI, from <see cref="MongoFactory"/>, or from a hand-built <see cref="MongoClient"/>.
+/// at all — from DI, from <see cref="Mongo"/>, or from a hand-built <see cref="MongoClient"/>.
 /// Building a client and asking it for a database opens no connections, so none of this needs a server.
 /// </summary>
 public class MongoDatabaseExtensionsTests
@@ -14,7 +15,7 @@ public class MongoDatabaseExtensionsTests
     private sealed record Page<T>;
 
     private static IMongoDatabase Database(string name = "orders") =>
-        new MongoClient(Helper.Connection).GetDatabase(name);
+        new MongoClient(Given.Connection).GetDatabase(name);
 
     [Fact]
     public void GetCollection_WithoutName_UsesTheDocumentTypeName()
@@ -69,22 +70,12 @@ public class MongoDatabaseExtensionsTests
     }
 
     [Fact]
-    public void GetCollection_FollowsTheProcessWideDefaultConvention()
+    public void GetCollection_HonoursTheGivenCollectionSettings()
     {
-        var previous = MongoNaming.Default;
+        var collection = Database().GetCollection<BsonDocument>(
+            settings: new MongoCollectionSettings { WriteConcern = WriteConcern.WMajority });
 
-        try
-        {
-            MongoNaming.Default = type => $"{type.Name}Collection";
-
-            Assert.Equal(
-                "BsonDocumentCollection",
-                Database().GetCollection<BsonDocument>().CollectionNamespace.CollectionName);
-        }
-        finally
-        {
-            MongoNaming.Default = previous;
-        }
+        Assert.Equal(WriteConcern.WMajority, collection.Settings.WriteConcern);
     }
 
     [Fact]
@@ -119,7 +110,7 @@ public class MongoDatabaseExtensionsTests
     [Fact]
     public async Task InTransactionAsync_WithNullBody_ThrowsArgumentNullException()
     {
-        var client = new MongoClient(Helper.Connection);
+        var client = new MongoClient(Given.Connection);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => client.InTransactionAsync<int>(null!));
 
@@ -130,32 +121,32 @@ public class MongoDatabaseExtensionsTests
     [Fact]
     public void CreateDatabase_UsesTheConfiguredName()
     {
-        var db = MongoFactory.CreateDatabase(
-            new MongoOptions { Connection = Helper.Connection, Database = "orders" });
+        var db = Mongo.Database(
+            new MongoOptions { Connection = Given.Connection, Database = "orders" });
 
         Assert.Equal("orders", db.DatabaseNamespace.DatabaseName);
     }
 
     [Theory]
-    [InlineData(null, Helper.Database, nameof(MongoOptions.Connection))]
-    [InlineData("", Helper.Database, nameof(MongoOptions.Connection))]
-    [InlineData("   ", Helper.Database, nameof(MongoOptions.Connection))]
-    [InlineData(Helper.Connection, null, nameof(MongoOptions.Database))]
-    [InlineData(Helper.Connection, "", nameof(MongoOptions.Database))]
+    [InlineData(null, Given.DatabaseName, nameof(MongoOptions.Connection))]
+    [InlineData("", Given.DatabaseName, nameof(MongoOptions.Connection))]
+    [InlineData("   ", Given.DatabaseName, nameof(MongoOptions.Connection))]
+    [InlineData(Given.Connection, null, nameof(MongoOptions.Database))]
+    [InlineData(Given.Connection, "", nameof(MongoOptions.Database))]
     public void CreateClient_WithIncompleteOptions_ThrowsOptionsValidationException(
         string? connection, string? database, string expected)
     {
         var options = new MongoOptions { Connection = connection, Database = database };
 
-        var exception = Assert.Throws<OptionsValidationException>(() => MongoFactory.CreateClient(options));
+        var exception = Assert.Throws<OptionsValidationException>(() => Mongo.Client(options));
 
-        Assert.Contains(expected, exception.Message);
+        Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void CreateClient_WithNullOptions_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => MongoFactory.CreateClient(null!));
+        Assert.Throws<ArgumentNullException>(() => Mongo.Client(null!));
     }
 
     [Fact]
@@ -163,8 +154,8 @@ public class MongoDatabaseExtensionsTests
     {
         var applied = false;
 
-        var client = MongoFactory.CreateClient(
-            new MongoOptions { Connection = Helper.Connection, Database = Helper.Database },
+        var client = Mongo.Client(
+            new MongoOptions { Connection = Given.Connection, Database = Given.DatabaseName },
             new MongoSetup
             {
                 ConfigureClient = settings =>
@@ -179,43 +170,46 @@ public class MongoDatabaseExtensionsTests
     }
 
     /// <summary>
-    /// The driver's convention registry is process-global and has no upsert, so creating a client
-    /// twice must not stack duplicate packs.
+    /// The driver's registry has no upsert, so creating a client twice must not stack duplicate
+    /// packs. The count is taken as a delta because the registry is process-global: any other pack
+    /// carrying the same convention is none of this test's business.
     /// </summary>
     [Fact]
-    public void CreateClient_RegistersConventionsIdempotently()
+    public void CreateClient_RegistersConventionsOncePerPackName()
     {
         var packName = $"test-{Guid.NewGuid():N}";
 
         MongoSetup Setup() => new()
         {
             ConventionPackName = packName,
-            Conventions = pack => pack.Add(new MongoDB.Bson.Serialization.Conventions.CamelCaseElementNameConvention())
+            Conventions = pack => pack.Add(new CamelCaseElementNameConvention())
         };
+
+        var before = CamelCasingConventions();
 
         try
         {
-            var options = new MongoOptions { Connection = Helper.Connection, Database = Helper.Database };
-            MongoFactory.CreateClient(options, Setup());
-            MongoFactory.CreateClient(options, Setup());
+            var options = new MongoOptions { Connection = Given.Connection, Database = Given.DatabaseName };
+            Mongo.Client(options, Setup());
+            Mongo.Client(options, Setup());
 
-            var registered = MongoDB.Bson.Serialization.Conventions.ConventionRegistry
-                .Lookup(typeof(BsonDocument))
-                .Conventions
-                .OfType<MongoDB.Bson.Serialization.Conventions.CamelCaseElementNameConvention>()
-                .Count();
-
-            Assert.Equal(1, registered);
+            Assert.Equal(before + 1, CamelCasingConventions());
         }
         finally
         {
-            MongoDB.Bson.Serialization.Conventions.ConventionRegistry.Remove(packName);
+            ConventionRegistry.Remove(packName);
         }
     }
+
+    private static int CamelCasingConventions() =>
+        ConventionRegistry.Lookup(typeof(BsonDocument))
+            .Conventions
+            .OfType<CamelCaseElementNameConvention>()
+            .Count();
 
     [Fact]
     public void CreateGridFsBucket_WhenDatabaseIsNull_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => MongoFactory.CreateGridFsBucket(null!));
+        Assert.Throws<ArgumentNullException>(() => Mongo.GridFs(null!));
     }
 }

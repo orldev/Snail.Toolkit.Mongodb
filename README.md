@@ -29,11 +29,11 @@ public class OrderRepository(IMongoDatabase db)          // no client, no wrappe
 builder.Services.AddMongodb(builder.Configuration);
 ```
 
-reading the `mongo` section:
+reading the `Mongodb` section:
 
 ```json
 {
-  "mongodb": {
+  "Mongodb": {
     "Connection": "mongodb://username:password@localhost:27017",
     "Database": "test"
   }
@@ -45,8 +45,8 @@ or configure it inline:
 ```c#
 builder.Services.AddMongodb(options =>
 {
-    options.Connection = builder.Configuration["mongo:Connection"];
-    options.Database = builder.Configuration["mongo:Database"];
+    options.Connection = builder.Configuration["Mongodb:Connection"];
+    options.Database = builder.Configuration["Mongodb:Database"];
 });
 ```
 
@@ -64,7 +64,9 @@ builder.Services.Configure<MongoOptions>(o => o.Database = "tenant-42");
 
 Validation is generated from the data annotations on `MongoOptions` — no reflection at run time — and
 runs at host startup via `ValidateOnStart`. A missing setting refuses to bring the process up, with a
-message naming the property, rather than surfacing on the first query.
+message naming the property, rather than surfacing on the first query. `ValidateOnStart` needs a host
+to run in: outside one — a bare `ServiceCollection`, a console app — the same failure surfaces on the
+first resolve instead.
 
 Anything configuration cannot carry — delegates and driver option objects — goes in `setup`:
 
@@ -78,18 +80,25 @@ builder.Services.AddMongodb(builder.Configuration, sectionName: "storage", setup
 ```
 
 `Conventions` go into the driver's `ConventionRegistry`, which is process-global: they affect every
-client in the process, not just this registration.
+client in the process, not just this registration, and `ConventionPackName` does not change that —
+two packs under two names both land on the same document type. They are registered while the
+container is being built, because a BSON class map is frozen the first time its type is serialised
+and a convention arriving after that is silently ignored. A pack name is registered once per
+process; the first registration wins.
 
 Outside DI — a console app, a migration, a test — build the same things directly:
 
 ```c#
-var db = MongoFactory.CreateDatabase(new MongoOptions { Connection = "...", Database = "test" });
+var db = Mongo.Database(new MongoOptions { Connection = "...", Database = "test" });
 ```
 
 #### Several databases
 
-`AddMongodb` uses `TryAdd`, so it registers one set. For more than one database, register them under
-keys — the key doubles as the options name, and each key gets its own client:
+`AddMongodb` registers one set, and the first call is the one that stands — so a package can call it
+defensively on an application that already did. Naming a *different* configuration section in a second
+call is refused instead, with both section names in the message: that is not a repeated registration,
+it is two databases asked of an API that registers one. Register those under keys — the key doubles as
+the options name, and each key gets its own client:
 
 ```c#
 builder.Services
@@ -110,11 +119,13 @@ generics unwrapped, so `Page<Order>` becomes `PageOfOrder`:
 db.GetCollection<Order>();                            // "Order"
 db.GetCollection<Order>("orders_v2");                 // explicit
 db.GetCollection<Order>(naming: t => $"{t.Name}s");   // per call
-MongoNaming.Default = t => $"{t.Name}s";              // process-wide, set once at start-up
+MongoNaming.Use(t => $"{t.Name}s");                    // process-wide, chosen once at start-up
 ```
 
 The convention is process-wide, like the driver's own conventions — a document type maps to one
-collection name, and threading that through every call site would cost more than it buys.
+collection name, and threading that through every call site would cost more than it buys. `Use`
+accepts one call and refuses the rest: as a settable property, two components could each set it and
+whichever ran second won without a word.
 
 Filters, updates and sorts use the driver's `Builders<T>` directly. There are no aliases for them
 here: they are static, they need no connection, and wrapping them only made query-building code
@@ -182,6 +193,15 @@ back. Pass the `session` to every operation that must take part — work that ig
 transaction. Requires a replica set or sharded cluster. A class holding only a database can reach the
 client through `db.Client`.
 
+The aggregation helpers take the session too, so a read inside a transaction sees its own uncommitted
+writes:
+
+```c#
+var pending = await db.AggregateToListAsync(pipeline, "orders", session: session, cancellationToken: ct);
+```
+
+The GridFS helpers do not, and cannot: `IGridFSBucket` declares no overload taking a session.
+
 ### GridFS
 
 One round trip for content and metadata:
@@ -216,8 +236,12 @@ builder.Services.AddHealthChecks().AddMongodb();
 builder.Services.AddHealthChecks().AddKeyedMongodb("orders");
 ```
 
-Pings the registered database and reports the exception on failure. Accepts a name, a failure status
-and tags.
+Runs `listCollections` against the registered database and reports the exception on failure. Accepts
+a name, a failure status and tags.
+
+The probe is deliberately not `ping`: MongoDB answers a ping without authentication, so a connection
+string that has lost its credentials passes a ping check while every query fails with `requires
+authentication`. The check has to run something the server refuses to an unauthenticated client.
 
 ### Tests
 

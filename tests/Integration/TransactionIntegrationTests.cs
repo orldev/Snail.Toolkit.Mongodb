@@ -131,4 +131,34 @@ public class TransactionIntegrationTests(MongoReplicaSetFixture fixture)
 
         Assert.Equal(1, await collection.CountDocumentsAsync(Builders<Order>.Filter.Empty));
     }
+
+    /// <summary>
+    /// The library ships a transaction helper and a set of aggregation helpers, and until the
+    /// session parameter existed the two could not be used together: an aggregation that ignores the
+    /// session runs outside the transaction and cannot see its uncommitted writes.
+    /// </summary>
+    [Fact]
+    public async Task AggregateToListAsync_WithTheSession_JoinsTheTransaction()
+    {
+        var db = fixture.CreateDatabase();
+        var collection = db.GetCollection<Order>();
+        PipelineDefinition<Order, Order> pipeline = new EmptyPipelineDefinition<Order>();
+
+        var inside = -1;
+        var outside = -1;
+
+        await db.Client.InTransactionAsync(async (session, ct) =>
+        {
+            await collection.InsertOneAsync(session, new Order { Product = "book" }, cancellationToken: ct);
+
+            inside = (await db.AggregateToListAsync(
+                pipeline, nameof(Order), session: session, cancellationToken: ct)).Count;
+
+            outside = (await db.AggregateToListAsync(
+                pipeline, nameof(Order), cancellationToken: ct)).Count;
+        });
+
+        Assert.Equal(1, inside);
+        Assert.Equal(0, outside);
+    }
 }

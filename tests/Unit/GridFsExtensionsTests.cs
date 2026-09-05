@@ -6,12 +6,12 @@ namespace Snail.Toolkit.Mongodb.Tests.Unit;
 
 /// <summary>
 /// Argument guards and failure behaviour, both observable without a server. Everything that needs
-/// stored files is covered in <c>Integration.GridFSExtensionsIntegrationTests</c> against a real bucket.
+/// stored files is covered in <c>Integration.GridFsExtensionsIntegrationTests</c> against a real bucket.
 /// </summary>
-public class GridFSExtensionsTests
+public class GridFsExtensionsTests
 {
-    private static IGridFSBucket Bucket(string connection = Helper.Connection) =>
-        Helper.Db(connection).GridFs();
+    private static IGridFSBucket Bucket(string connection = Given.Connection) =>
+        Given.Database(connection).GridFs();
 
     [Fact]
     public async Task Lookups_WhenBucketIsNull_ThrowArgumentNullException()
@@ -72,7 +72,7 @@ public class GridFSExtensionsTests
     public async Task FindOneByObjectIdAsync_WhenTheServerIsUnreachable_Throws()
     {
         var exception = await Record.ExceptionAsync(
-            () => Bucket(Helper.UnreachableConnection).FindOneByObjectIdAsync(ObjectId.GenerateNewId()));
+            () => Bucket(Given.UnreachableConnection).FindOneByObjectIdAsync(ObjectId.GenerateNewId()));
 
         Assert.NotNull(exception);
     }
@@ -81,7 +81,7 @@ public class GridFSExtensionsTests
     public async Task OpenDownloadByObjectIdAsync_WhenTheServerIsUnreachable_Throws()
     {
         var exception = await Record.ExceptionAsync(
-            () => Bucket(Helper.UnreachableConnection).OpenDownloadByObjectIdAsync(ObjectId.GenerateNewId()));
+            () => Bucket(Given.UnreachableConnection).OpenDownloadByObjectIdAsync(ObjectId.GenerateNewId()));
 
         Assert.NotNull(exception);
     }
@@ -97,7 +97,7 @@ public class GridFSExtensionsTests
     [Fact]
     public void GridFs_HonoursTheGivenBucketOptions()
     {
-        var bucket = Helper.Db().GridFs(new GridFSBucketOptions
+        var bucket = Given.Database().GridFs(new GridFSBucketOptions
         {
             BucketName = "attachments",
             ChunkSizeBytes = 1024

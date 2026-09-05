@@ -4,7 +4,13 @@ namespace Snail.Toolkit.Mongodb.GridFs;
 /// Lookup and download helpers over <see cref="IGridFSBucket"/> that return the file and its
 /// content type in one call.
 /// </summary>
-public static class GridFSExtensions
+/// <remarks>
+/// None of these take a session, and none can: <see cref="IGridFSBucket"/> in MongoDB.Driver 3.10
+/// declares no overload of <c>FindAsync</c> or <c>OpenDownloadStreamAsync</c> that accepts one, so a
+/// GridFS read cannot join the transaction opened by <c>InTransactionAsync</c>. The aggregation
+/// helpers on <see cref="IMongoDatabase"/> can.
+/// </remarks>
+public static class GridFsExtensions
 {
     /// <summary>
     /// The metadata key holding the content type of a file.

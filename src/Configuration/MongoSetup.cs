@@ -10,7 +10,12 @@ public sealed class MongoSetup
     /// The name under which <see cref="Conventions"/> are registered in the driver's global
     /// <see cref="ConventionRegistry"/>.
     /// </summary>
-    public const string DefaultConventionPackName = "default";
+    /// <remarks>
+    /// Named after this package rather than something generic: the registry is shared by every
+    /// library in the process, and a pack called <c>default</c> is one another library is liable to
+    /// register — or remove — as its own.
+    /// </remarks>
+    public const string DefaultConventionPackName = "Snail.Toolkit.Mongodb";
 
     /// <summary>
     /// GridFS bucket options, such as bucket name or chunk size.
@@ -35,8 +40,14 @@ public sealed class MongoSetup
     public Action<ConventionPack>? Conventions { get; set; }
 
     /// <summary>
-    /// The name used to register <see cref="Conventions"/>. Change it when a process hosts several
-    /// clients that need different conventions.
+    /// The name <see cref="Conventions"/> are registered under.
     /// </summary>
+    /// <remarks>
+    /// It does not scope conventions to a client, and no name can: the driver's registry takes a type
+    /// filter, not a client, so a pack applies to every mapped type in the process. Registering camel
+    /// casing under one name and extra-element tolerance under another puts both on the same class
+    /// map. Change this only to register a second, additional pack. A name is applied once per
+    /// process and the first registration of it wins.
+    /// </remarks>
     public string ConventionPackName { get; set; } = DefaultConventionPackName;
 }

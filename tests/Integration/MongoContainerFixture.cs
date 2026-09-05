@@ -28,11 +28,11 @@ public sealed class MongoContainerFixture : IAsyncLifetime
     /// A database of its own, on a client the test owns.
     /// </summary>
     public IMongoDatabase CreateDatabase(MongoSetup? setup = null) =>
-        MongoFactory.CreateDatabase(
+        Mongo.Database(
             new MongoOptions { Connection = Connection, Database = NewDatabaseName() }, setup);
 
     public IGridFSBucket CreateGridFs(MongoSetup? setup = null) =>
-        MongoFactory.CreateGridFsBucket(CreateDatabase(setup), setup);
+        Mongo.GridFs(CreateDatabase(setup), setup);
 }
 
 [CollectionDefinition(Name)]

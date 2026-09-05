@@ -48,9 +48,8 @@ public static class MongoServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(sectionName);
 
-        services.Bind(OptionsName(null), configuration, sectionName);
-
-        return services.Register(serviceKey: null, setup);
+        return services.Register(
+            serviceKey: null, sectionName, options => BindSection(options, configuration, sectionName), setup);
     }
 
     /// <summary>
@@ -69,11 +68,7 @@ public static class MongoServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
 
-        services.AddOptions<MongoOptions>()
-            .Configure(options)
-            .ValidateOnStart();
-
-        return services.Register(serviceKey: null, setup);
+        return services.Register(serviceKey: null, sectionName: null, builder => builder.Configure(options), setup);
     }
 
     /// <summary>
@@ -105,9 +100,8 @@ public static class MongoServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(sectionName);
 
-        services.Bind(serviceKey, configuration, sectionName);
-
-        return services.Register(serviceKey, setup);
+        return services.Register(
+            serviceKey, sectionName, options => BindSection(options, configuration, sectionName), setup);
     }
 
     /// <summary>
@@ -130,24 +124,18 @@ public static class MongoServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceKey);
         ArgumentNullException.ThrowIfNull(options);
 
-        services.AddOptions<MongoOptions>(serviceKey)
-            .Configure(options)
-            .ValidateOnStart();
-
-        return services.Register(serviceKey, setup);
+        return services.Register(serviceKey, sectionName: null, builder => builder.Configure(options), setup);
     }
 
-    private static void Bind(
-        this IServiceCollection services,
-        string optionsName,
+    private static void BindSection(
+        OptionsBuilder<MongoOptions> options,
         IConfiguration configuration,
         string sectionName) =>
-        services.AddOptions<MongoOptions>(optionsName)
+        options
             .Bind(configuration.GetSection(sectionName))
             .Validate(
                 _ => configuration.GetSection(sectionName).Exists(),
-                $"Configuration section '{sectionName}' was not found. Add it, or pass a different section name.")
-            .ValidateOnStart();
+                $"Configuration section '{sectionName}' was not found. Add it, or pass a different section name.");
 
     /// <summary>
     /// Registers the validator, the setup instance and the three driver types.
@@ -157,24 +145,66 @@ public static class MongoServiceCollectionExtensions
     /// built with a null key <em>is</em> an unkeyed descriptor, and the key travels into the factory,
     /// where it doubles as the options name. Construction of the client is deferred to the first
     /// resolve, so a registration skipped by <c>TryAdd</c> leaves no orphaned connection pool behind.
+    /// Conventions are the exception: they have to reach the driver before any document type is
+    /// serialised, so they are applied here rather than when the client is built.
+    ///
+    /// A repeated call for the same key keeps the first registration. <c>TryAdd</c> alone did not:
+    /// options configuration is additive, so a second call bound its own section over the first
+    /// registration's settings, and a second call naming a section that did not exist failed the
+    /// whole host even though the first call was valid.
+    ///
+    /// Staying silent about it is only right where the two calls cannot be told apart. Settings
+    /// arrive as delegates, which compare to nothing, so a repeated delegate registration is a plain
+    /// no-op — that is what lets one package call this defensively without breaking an application
+    /// that already called it. A section name is a value, so two calls naming two sections are a
+    /// mistake the compiler cannot catch and this can: they want two databases out of an API that
+    /// registers one, and the answer is <c>AddKeyedMongodb</c>.
     /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="serviceKey">The key to register under, or null for the unkeyed registration.</param>
+    /// <param name="sectionName">The configuration section the settings came from, if any.</param>
+    /// <param name="configureOptions">Binds or configures the settings.</param>
     /// <param name="setup">Configures delegates and driver option objects.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The key is already registered from a different configuration section.
+    /// </exception>
     private static IServiceCollection Register(
         this IServiceCollection services,
         string? serviceKey,
+        string? sectionName,
+        Action<OptionsBuilder<MongoOptions>> configureOptions,
         Action<MongoSetup>? setup)
     {
+        if (services.Registration(serviceKey) is { } first)
+        {
+            if (Disagree(first.SectionName, sectionName))
+                throw new InvalidOperationException(
+                    $"MongoDB is already registered{Key(serviceKey)} from configuration section " +
+                    $"'{first.SectionName}', and this call names '{sectionName}'. One registration " +
+                    "serves one database; use AddKeyedMongodb with a distinct key for a second one.");
+
+            return services;
+        }
+
+        services.Add(ServiceDescriptor.KeyedSingleton(serviceKey, new Registered(sectionName)));
+
+        var options = services.AddOptions<MongoOptions>(OptionsName(serviceKey));
+        configureOptions(options);
+        options.ValidateOnStart();
+
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<MongoOptions>>(MongoOptionsValidator.Instance));
 
         if (setup is not null)
+        {
             services.AddOptions<MongoSetup>(OptionsName(serviceKey)).Configure(setup);
+
+            Mongo.ApplyConventions(Configured(setup));
+        }
 
         services.TryAdd(ServiceDescriptor.KeyedSingleton<IMongoClient>(
             serviceKey,
-            (sp, key) => MongoFactory.CreateClient(sp.Options(key), sp.Setup(key))));
+            (sp, key) => Mongo.Client(sp.Options(key), sp.Setup(key))));
 
         services.TryAdd(ServiceDescriptor.KeyedSingleton<IMongoDatabase>(
             serviceKey,
@@ -182,10 +212,46 @@ public static class MongoServiceCollectionExtensions
 
         services.TryAdd(ServiceDescriptor.KeyedSingleton<IGridFSBucket>(
             serviceKey,
-            (sp, key) => MongoFactory.CreateGridFsBucket(
+            (sp, key) => Mongo.GridFs(
                 sp.GetRequiredKeyedService<IMongoDatabase>(key), sp.Setup(key))));
 
         return services;
+    }
+
+    /// <summary>
+    /// Records that a key has been registered, and what it was registered from.
+    /// </summary>
+    private sealed record Registered(string? SectionName);
+
+    private static Registered? Registration(this IServiceCollection services, string? serviceKey) =>
+        services.FirstOrDefault(d => d.ServiceType == typeof(Registered) && Equals(d.ServiceKey, serviceKey))
+            is { } descriptor
+            ? (descriptor.IsKeyedService
+                ? descriptor.KeyedImplementationInstance
+                : descriptor.ImplementationInstance) as Registered
+            : null;
+
+    /// <summary>
+    /// Two section names that name two databases. A call configuring settings by delegate names none,
+    /// and says nothing either way.
+    /// </summary>
+    private static bool Disagree(string? first, string? second) =>
+        first is not null &&
+        second is not null &&
+        string.Equals(first, second, StringComparison.OrdinalIgnoreCase) is false;
+
+    private static string Key(string? serviceKey) =>
+        serviceKey is null ? string.Empty : $" under key '{serviceKey}'";
+
+    /// <summary>
+    /// The settings as the caller configured them, needed before the container can build them.
+    /// </summary>
+    private static MongoSetup Configured(Action<MongoSetup> setup)
+    {
+        var value = new MongoSetup();
+        setup(value);
+
+        return value;
     }
 
     /// <summary>

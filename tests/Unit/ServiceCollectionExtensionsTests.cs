@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Conventions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -16,7 +18,7 @@ public class ServiceCollectionExtensionsTests
 {
     private static ServiceProvider Provider() =>
         new ServiceCollection()
-            .AddMongodb(Helper.GetConfiguration())
+            .AddMongodb(Given.Configuration())
             .BuildServiceProvider();
 
     private static IHost Host(IConfiguration configuration) =>
@@ -27,7 +29,7 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public void AddMongo_RegistersTheDriverTypes()
     {
-        var services = new ServiceCollection().AddMongodb(Helper.GetConfiguration());
+        var services = new ServiceCollection().AddMongodb(Given.Configuration());
 
         Assert.Contains(services, d => d.ServiceType == typeof(IMongoClient));
         Assert.Contains(services, d => d.ServiceType == typeof(IMongoDatabase));
@@ -40,11 +42,11 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public void AddMongo_RegistersNothingBesidesDriverTypesAndOptions()
     {
-        var services = new ServiceCollection().AddMongodb(Helper.GetConfiguration());
+        var services = new ServiceCollection().AddMongodb(Given.Configuration());
 
         var mongoTypes = services
             .Select(d => d.ServiceType)
-            .Where(t => t.Namespace?.StartsWith("MongoDB") is true)
+            .Where(t => t.Namespace?.StartsWith("MongoDB", StringComparison.Ordinal) is true)
             .Distinct()
             .Order(Comparer<Type>.Create((a, b) => string.CompareOrdinal(a.Name, b.Name)))
             .Select(t => t.Name);
@@ -92,16 +94,16 @@ public class ServiceCollectionExtensionsTests
         using var provider = Provider();
 
         Assert.Equal(
-            Helper.Database,
+            Given.DatabaseName,
             provider.GetRequiredService<IMongoDatabase>().DatabaseNamespace.DatabaseName);
     }
 
     [Fact]
     public void AddMongo_ReadsACustomSectionName()
     {
-        var configuration = Helper.GetConfiguration(new Dictionary<string, string>
+        var configuration = Given.Configuration(new Dictionary<string, string>
         {
-            { "storage:Connection", Helper.Connection },
+            { "storage:Connection", Given.Connection },
             { "storage:Database", "custom" }
         });
 
@@ -114,11 +116,43 @@ public class ServiceCollectionExtensionsTests
             provider.GetRequiredService<IMongoDatabase>().DatabaseNamespace.DatabaseName);
     }
 
+    /// <summary>
+    /// A class map is frozen the first time its type is serialised, so conventions that arrive when
+    /// the client is first resolved miss every type touched before that — and what gets touched first
+    /// differs between a development run and a production one. Registration has to apply them.
+    /// </summary>
+    [Fact]
+    public void AddMongodb_AppliesConventionsWithoutResolvingAnything()
+    {
+        var packName = $"test-{Guid.NewGuid():N}";
+
+        try
+        {
+            new ServiceCollection().AddMongodb(
+                o =>
+                {
+                    o.Connection = Given.Connection;
+                    o.Database = Given.DatabaseName;
+                },
+                s =>
+                {
+                    s.ConventionPackName = packName;
+                    s.Conventions = pack => pack.Add(new CamelCaseElementNameConvention());
+                });
+
+            Assert.Contains("\"userName\"", new ConventionProbe { UserName = "ann" }.ToJson(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            ConventionRegistry.Remove(packName);
+        }
+    }
+
     [Fact]
     public void AddMongo_AppliesTheSetupDelegate()
     {
         using var provider = new ServiceCollection()
-            .AddMongodb(Helper.GetConfiguration(), setup: s => s.GridFsBucket = new GridFSBucketOptions
+            .AddMongodb(Given.Configuration(), setup: s => s.GridFsBucket = new GridFSBucketOptions
             {
                 BucketName = "attachments"
             })
@@ -134,52 +168,52 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public async Task AddMongo_WhenSectionIsMissing_FailsStartupWithTheSectionName()
     {
-        var configuration = Helper.GetConfiguration(new Dictionary<string, string>
+        var configuration = Given.Configuration(new Dictionary<string, string>
         {
-            { "other:Connection", Helper.Connection }
+            { "other:Connection", Given.Connection }
         });
 
         using var host = Host(configuration);
 
         var exception = await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
 
-        Assert.Contains(MongoServiceCollectionExtensions.DefaultSectionName, exception.Message);
+        Assert.Contains(MongoServiceCollectionExtensions.DefaultSectionName, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task AddMongo_WhenConnectionIsMissing_FailsStartupNamingTheProperty()
     {
-        var configuration = Helper.GetConfiguration(new Dictionary<string, string>
+        var configuration = Given.Configuration(new Dictionary<string, string>
         {
-            { $"{Helper.Section}:Database", Helper.Database }
+            { $"{Given.Section}:Database", Given.DatabaseName }
         });
 
         using var host = Host(configuration);
 
         var exception = await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
 
-        Assert.Contains(nameof(MongoOptions.Connection), exception.Message);
+        Assert.Contains(nameof(MongoOptions.Connection), exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task AddMongo_WhenDatabaseIsMissing_FailsStartupNamingTheProperty()
     {
-        var configuration = Helper.GetConfiguration(new Dictionary<string, string>
+        var configuration = Given.Configuration(new Dictionary<string, string>
         {
-            { $"{Helper.Section}:Connection", Helper.Connection }
+            { $"{Given.Section}:Connection", Given.Connection }
         });
 
         using var host = Host(configuration);
 
         var exception = await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync());
 
-        Assert.Contains(nameof(MongoOptions.Database), exception.Message);
+        Assert.Contains(nameof(MongoOptions.Database), exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task AddMongo_WithCompleteSettings_StartsUp()
     {
-        using var host = Host(Helper.GetConfiguration());
+        using var host = Host(Given.Configuration());
 
         await host.StartAsync();
         await host.StopAsync();
@@ -188,9 +222,9 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public void AddMongo_WhenSettingsAreIncomplete_AlsoFailsOnResolve()
     {
-        var configuration = Helper.GetConfiguration(new Dictionary<string, string>
+        var configuration = Given.Configuration(new Dictionary<string, string>
         {
-            { $"{Helper.Section}:Database", Helper.Database }
+            { $"{Given.Section}:Database", Given.DatabaseName }
         });
 
         using var provider = new ServiceCollection()
@@ -206,7 +240,7 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public void Configure_AfterAddMongo_OverridesTheBoundSettings()
     {
-        var services = new ServiceCollection().AddMongodb(Helper.GetConfiguration());
+        var services = new ServiceCollection().AddMongodb(Given.Configuration());
         services.Configure<MongoOptions>(o => o.Database = "overridden");
 
         using var provider = services.BuildServiceProvider();
@@ -219,7 +253,7 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public void PostConfigure_AfterAddMongo_OverridesTheBoundSettings()
     {
-        var services = new ServiceCollection().AddMongodb(Helper.GetConfiguration());
+        var services = new ServiceCollection().AddMongodb(Given.Configuration());
         services.PostConfigure<MongoOptions>(o => o.Database = "post");
 
         using var provider = services.BuildServiceProvider();
@@ -236,8 +270,8 @@ public class ServiceCollectionExtensionsTests
 
         var options = provider.GetRequiredService<IOptions<MongoOptions>>().Value;
 
-        Assert.Equal(Helper.Connection, options.Connection);
-        Assert.Equal(Helper.Database, options.Database);
+        Assert.Equal(Given.Connection, options.Connection);
+        Assert.Equal(Given.DatabaseName, options.Database);
     }
 
     [Fact]
@@ -246,8 +280,8 @@ public class ServiceCollectionExtensionsTests
         using var provider = new ServiceCollection()
             .AddMongodb(o =>
             {
-                o.Connection = Helper.Connection;
-                o.Database = Helper.Database;
+                o.Connection = Given.Connection;
+                o.Database = Given.DatabaseName;
             })
             .BuildServiceProvider();
 
@@ -259,22 +293,134 @@ public class ServiceCollectionExtensionsTests
     {
         var services = new ServiceCollection();
 
-        Assert.Throws<ArgumentNullException>(() => ((IServiceCollection)null!).AddMongodb(Helper.GetConfiguration()));
+        Assert.Throws<ArgumentNullException>(() => ((IServiceCollection)null!).AddMongodb(Given.Configuration()));
         Assert.Throws<ArgumentNullException>(() => services.AddMongodb((IConfiguration)null!));
         Assert.Throws<ArgumentNullException>(() => services.AddMongodb((Action<MongoOptions>)null!));
-        Assert.Throws<ArgumentNullException>(() => services.AddKeyedMongodb(null!, Helper.GetConfiguration()));
+        Assert.Throws<ArgumentNullException>(() => services.AddKeyedMongodb(null!, Given.Configuration()));
     }
 
+    /// <summary>
+    /// The defensive case: one package calls <c>AddMongodb</c> on an application that already did.
+    /// The two calls are indistinguishable, so the first registration simply stands.
+    /// </summary>
     [Fact]
-    public void AddMongo_IsIdempotent()
+    public void AddMongodb_WhenCalledTwiceForTheSameSection_KeepsTheFirstRegistration()
     {
-        var configuration = Helper.GetConfiguration();
+        var configuration = Given.Configuration();
 
         var services = new ServiceCollection()
             .AddMongodb(configuration)
-            .AddMongodb(configuration);
+            .AddMongodb(configuration, setup: s => s.GridFsBucket = new GridFSBucketOptions
+            {
+                BucketName = "ignored"
+            });
+
+        using var provider = services.BuildServiceProvider();
 
         Assert.Single(services, d => d.ServiceType == typeof(IMongoClient));
+        Assert.Equal(Given.DatabaseName, provider.GetRequiredService<IMongoDatabase>().DatabaseNamespace.DatabaseName);
+        Assert.Equal("fs", provider.GetRequiredService<IGridFSBucket>().Options.BucketName);
+    }
+
+    /// <summary>
+    /// Settings given as a delegate compare to nothing, so a repeated call cannot be judged and the
+    /// first registration stands rather than the second silently binding over it.
+    /// </summary>
+    [Fact]
+    public void AddMongodb_WhenCalledTwiceWithDelegates_KeepsTheFirstRegistration()
+    {
+        using var provider = new ServiceCollection()
+            .AddMongodb(o =>
+            {
+                o.Connection = Given.Connection;
+                o.Database = "first";
+            })
+            .AddMongodb(o =>
+            {
+                o.Connection = Given.Connection;
+                o.Database = "second";
+            })
+            .BuildServiceProvider();
+
+        Assert.Equal("first", provider.GetRequiredService<IMongoDatabase>().DatabaseNamespace.DatabaseName);
+    }
+
+    /// <summary>
+    /// Two section names are two databases asked of an API that registers one. Binding was additive,
+    /// so this used to leave one client silently pointed at the second section; it is a mistake worth
+    /// naming, and the fix is a keyed registration.
+    /// </summary>
+    [Fact]
+    public void AddMongodb_WhenASecondCallNamesAnotherSection_ThrowsNamingBoth()
+    {
+        var configuration = Given.Configuration(new Dictionary<string, string>
+        {
+            { "first:Connection", Given.Connection },
+            { "first:Database", "first" },
+            { "second:Connection", Given.Connection },
+            { "second:Database", "second" }
+        });
+
+        var services = new ServiceCollection().AddMongodb(configuration, "first");
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddMongodb(configuration, "second"));
+
+        Assert.Contains("first", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("second", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(MongoServiceCollectionExtensions.AddKeyedMongodb), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddKeyedMongodb_WhenASecondCallNamesAnotherSection_ThrowsNamingTheKey()
+    {
+        var configuration = Given.Configuration(new Dictionary<string, string>
+        {
+            { "first:Connection", Given.Connection },
+            { "first:Database", "first" },
+            { "second:Connection", Given.Connection },
+            { "second:Database", "second" }
+        });
+
+        var services = new ServiceCollection().AddKeyedMongodb("orders", configuration, "first");
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddKeyedMongodb("orders", configuration, "second"));
+
+        Assert.Contains("orders", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A second call naming a section that does not exist used to fail the whole host through
+    /// <c>ValidateOnStart</c>, quoting a section the first caller never asked for. It is now refused
+    /// where the mistake is, at registration.
+    /// </summary>
+    [Fact]
+    public void AddMongodb_WhenASecondCallNamesAMissingSection_ThrowsAtRegistration()
+    {
+        var configuration = Given.Configuration();
+
+        var services = new ServiceCollection().AddMongodb(configuration);
+
+        Assert.Throws<InvalidOperationException>(() => services.AddMongodb(configuration, "does-not-exist"));
+    }
+
+    /// <summary>
+    /// The whole point of the defensive case: two identical registrations must still bring the host up.
+    /// </summary>
+    [Fact]
+    public async Task AddMongodb_WhenCalledTwiceForTheSameSection_StartsUp()
+    {
+        var configuration = Given.Configuration();
+
+        using var host = new HostBuilder()
+            .ConfigureServices(services => services
+                .AddMongodb(configuration)
+                .AddMongodb(configuration))
+            .Build();
+
+        await host.StartAsync();
+        await host.StopAsync();
     }
 
     /// <summary>
@@ -284,14 +430,14 @@ public class ServiceCollectionExtensionsTests
     [Fact]
     public void AddMongo_WhenAClientIsAlreadyRegistered_DoesNotBuildASecondOne()
     {
-        var existing = new MongoClient(Helper.Connection);
+        var existing = new MongoClient(Given.Connection);
 
         using var provider = new ServiceCollection()
             .AddSingleton<IMongoClient>(existing)
             .AddMongodb(o =>
             {
                 o.Connection = "mongodb://this-would-throw-if-eagerly-parsed:not-a-port";
-                o.Database = Helper.Database;
+                o.Database = Given.DatabaseName;
             })
             .BuildServiceProvider();
 
@@ -308,12 +454,12 @@ public class ServiceCollectionExtensionsTests
         using var provider = new ServiceCollection()
             .AddKeyedMongodb("orders", o =>
             {
-                o.Connection = Helper.Connection;
+                o.Connection = Given.Connection;
                 o.Database = "orders";
             })
             .AddKeyedMongodb("audit", o =>
             {
-                o.Connection = Helper.Connection;
+                o.Connection = Given.Connection;
                 o.Database = "audit";
             })
             .BuildServiceProvider();
@@ -331,7 +477,7 @@ public class ServiceCollectionExtensionsTests
     public void AddKeyedMongo_KeepsTheThreeTypesConsistentUnderAKey()
     {
         using var provider = new ServiceCollection()
-            .AddKeyedMongodb("orders", Helper.GetConfiguration())
+            .AddKeyedMongodb("orders", Given.Configuration())
             .BuildServiceProvider();
 
         var client = provider.GetRequiredKeyedService<IMongoClient>("orders");
@@ -346,7 +492,7 @@ public class ServiceCollectionExtensionsTests
     public void AddKeyedMongo_DoesNotRegisterTheUnkeyedTypes()
     {
         using var provider = new ServiceCollection()
-            .AddKeyedMongodb("orders", Helper.GetConfiguration())
+            .AddKeyedMongodb("orders", Given.Configuration())
             .BuildServiceProvider();
 
         Assert.Null(provider.GetService<IMongoClient>());
@@ -362,12 +508,12 @@ public class ServiceCollectionExtensionsTests
         var services = new ServiceCollection()
             .AddKeyedMongodb("orders", o =>
             {
-                o.Connection = Helper.Connection;
+                o.Connection = Given.Connection;
                 o.Database = "orders";
             })
             .AddKeyedMongodb("audit", o =>
             {
-                o.Connection = Helper.Connection;
+                o.Connection = Given.Connection;
                 o.Database = "audit";
             });
 
@@ -381,5 +527,10 @@ public class ServiceCollectionExtensionsTests
         Assert.Equal(
             "audit",
             provider.GetRequiredKeyedService<IMongoDatabase>("audit").DatabaseNamespace.DatabaseName);
+    }
+
+    private sealed class ConventionProbe
+    {
+        public string? UserName { get; set; }
     }
 }
