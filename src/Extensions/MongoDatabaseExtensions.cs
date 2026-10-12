@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Snail.Toolkit.Mongodb.Extensions;
@@ -268,6 +269,7 @@ public static class MongoDatabaseExtensions
     /// <typeparam name="TInput">The type of the documents the pipeline reads.</typeparam>
     /// <typeparam name="TOutput">The type of the documents the pipeline yields.</typeparam>
     /// <returns>The documents, streamed batch by batch.</returns>
+    [SuppressMessage("Style", "IDE1006", Justification = "Shipped in 1.0.0 without the Async suffix; a rename would break its users.")]
     public static async IAsyncEnumerable<TOutput> AggregateAsAsyncEnumerable<TInput, TOutput>(
         this IMongoDatabase database,
         PipelineDefinition<TInput, TOutput> pipeline,

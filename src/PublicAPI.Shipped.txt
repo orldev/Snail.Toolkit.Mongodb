@@ -1,0 +1,92 @@
+#nullable enable
+Snail.Toolkit.Mongodb.Configuration.MongoNaming
+Snail.Toolkit.Mongodb.Configuration.MongoOptions
+Snail.Toolkit.Mongodb.Configuration.MongoOptions.Connection.get -> string?
+Snail.Toolkit.Mongodb.Configuration.MongoOptions.Connection.set -> void
+Snail.Toolkit.Mongodb.Configuration.MongoOptions.Database.get -> string?
+Snail.Toolkit.Mongodb.Configuration.MongoOptions.Database.set -> void
+Snail.Toolkit.Mongodb.Configuration.MongoOptions.MongoOptions() -> void
+Snail.Toolkit.Mongodb.Configuration.MongoOptionsValidator
+Snail.Toolkit.Mongodb.Configuration.MongoOptionsValidator.MongoOptionsValidator() -> void
+Snail.Toolkit.Mongodb.Configuration.MongoOptionsValidator.Validate(string? name, Snail.Toolkit.Mongodb.Configuration.MongoOptions! options) -> Microsoft.Extensions.Options.ValidateOptionsResult!
+Snail.Toolkit.Mongodb.Configuration.MongoSetup
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.ConfigureClient.get -> System.Action<MongoDB.Driver.MongoClientSettings!>?
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.ConfigureClient.set -> void
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.ConventionPackName.get -> string!
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.ConventionPackName.set -> void
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.Conventions.get -> System.Action<MongoDB.Bson.Serialization.Conventions.ConventionPack!>?
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.Conventions.set -> void
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.GridFsBucket.get -> MongoDB.Driver.GridFS.GridFSBucketOptions?
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.GridFsBucket.set -> void
+Snail.Toolkit.Mongodb.Configuration.MongoSetup.MongoSetup() -> void
+Snail.Toolkit.Mongodb.DependencyInjection.MongoHealthChecksBuilderExtensions
+Snail.Toolkit.Mongodb.DependencyInjection.MongoServiceCollectionExtensions
+Snail.Toolkit.Mongodb.Diagnostics.MongoHealthCheck
+Snail.Toolkit.Mongodb.Diagnostics.MongoHealthCheck.CheckHealthAsync(Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult>!
+Snail.Toolkit.Mongodb.Diagnostics.MongoHealthCheck.MongoHealthCheck(MongoDB.Driver.IMongoDatabase! database) -> void
+Snail.Toolkit.Mongodb.Extensions.MongoClientExtensions
+Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.ContentType.get -> string?
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.Dispose() -> void
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.File.get -> MongoDB.Driver.GridFS.GridFSFileInfo<MongoDB.Bson.ObjectId>!
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.Filename.get -> string!
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.Id.get -> MongoDB.Bson.ObjectId
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.Length.get -> long
+Snail.Toolkit.Mongodb.GridFs.GridFsDownload.Stream.get -> System.IO.Stream!
+Snail.Toolkit.Mongodb.GridFs.GridFsExtensions
+Snail.Toolkit.Mongodb.GridFs.GridFsFile
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.<Clone>$() -> Snail.Toolkit.Mongodb.GridFs.GridFsFile!
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.ContentType.get -> string?
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.ContentType.init -> void
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.Deconstruct(out MongoDB.Driver.GridFS.GridFSFileInfo<MongoDB.Bson.ObjectId>! File, out string? ContentType) -> void
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.Equals(Snail.Toolkit.Mongodb.GridFs.GridFsFile? other) -> bool
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.File.get -> MongoDB.Driver.GridFS.GridFSFileInfo<MongoDB.Bson.ObjectId>!
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.File.init -> void
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.Filename.get -> string!
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.GridFsFile(MongoDB.Driver.GridFS.GridFSFileInfo<MongoDB.Bson.ObjectId>! File, string? ContentType) -> void
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.Id.get -> MongoDB.Bson.ObjectId
+Snail.Toolkit.Mongodb.GridFs.GridFsFile.Length.get -> long
+Snail.Toolkit.Mongodb.Mongo
+const Snail.Toolkit.Mongodb.Configuration.MongoSetup.DefaultConventionPackName = "Snail.Toolkit.Mongodb" -> string!
+const Snail.Toolkit.Mongodb.DependencyInjection.MongoHealthChecksBuilderExtensions.DefaultName = "Mongodb" -> string!
+const Snail.Toolkit.Mongodb.DependencyInjection.MongoServiceCollectionExtensions.DefaultSectionName = "mongodb" -> string!
+const Snail.Toolkit.Mongodb.GridFs.GridFsExtensions.DefaultContentTypeKey = "ContentType" -> string!
+override Snail.Toolkit.Mongodb.GridFs.GridFsFile.Equals(object? obj) -> bool
+override Snail.Toolkit.Mongodb.GridFs.GridFsFile.GetHashCode() -> int
+override Snail.Toolkit.Mongodb.GridFs.GridFsFile.ToString() -> string!
+static Snail.Toolkit.Mongodb.Configuration.MongoNaming.Default.get -> System.Func<System.Type!, string!>!
+static Snail.Toolkit.Mongodb.Configuration.MongoNaming.ForType(System.Type! type) -> string!
+static Snail.Toolkit.Mongodb.Configuration.MongoNaming.Use(System.Func<System.Type!, string!>! naming) -> void
+static Snail.Toolkit.Mongodb.Configuration.MongoOptionsValidator.Instance.get -> Snail.Toolkit.Mongodb.Configuration.MongoOptionsValidator!
+static Snail.Toolkit.Mongodb.Configuration.MongoOptionsValidator.ThrowIfInvalid(Snail.Toolkit.Mongodb.Configuration.MongoOptions! options, string! name = "") -> void
+static Snail.Toolkit.Mongodb.DependencyInjection.MongoHealthChecksBuilderExtensions.AddKeyedMongodb(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, string! serviceKey, string? name = null, Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus? failureStatus = null, params string![]! tags) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!
+static Snail.Toolkit.Mongodb.DependencyInjection.MongoHealthChecksBuilderExtensions.AddMongodb(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, string! name = "Mongodb", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus? failureStatus = null, params string![]! tags) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!
+static Snail.Toolkit.Mongodb.DependencyInjection.MongoServiceCollectionExtensions.AddKeyedMongodb(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! serviceKey, Microsoft.Extensions.Configuration.IConfiguration! configuration, string! sectionName = "mongodb", System.Action<Snail.Toolkit.Mongodb.Configuration.MongoSetup!>? setup = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Snail.Toolkit.Mongodb.DependencyInjection.MongoServiceCollectionExtensions.AddKeyedMongodb(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! serviceKey, System.Action<Snail.Toolkit.Mongodb.Configuration.MongoOptions!>! options, System.Action<Snail.Toolkit.Mongodb.Configuration.MongoSetup!>? setup = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Snail.Toolkit.Mongodb.DependencyInjection.MongoServiceCollectionExtensions.AddMongodb(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! configuration, string! sectionName = "mongodb", System.Action<Snail.Toolkit.Mongodb.Configuration.MongoSetup!>? setup = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Snail.Toolkit.Mongodb.DependencyInjection.MongoServiceCollectionExtensions.AddMongodb(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Snail.Toolkit.Mongodb.Configuration.MongoOptions!>! options, System.Action<Snail.Toolkit.Mongodb.Configuration.MongoSetup!>? setup = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Snail.Toolkit.Mongodb.Extensions.MongoClientExtensions.InTransactionAsync(this MongoDB.Driver.IMongoClient! client, System.Func<MongoDB.Driver.IClientSessionHandle!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! body, MongoDB.Driver.TransactionOptions? transactionOptions = null, MongoDB.Driver.ClientSessionOptions? sessionOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static Snail.Toolkit.Mongodb.Extensions.MongoClientExtensions.InTransactionAsync<TResult>(this MongoDB.Driver.IMongoClient! client, System.Func<MongoDB.Driver.IClientSessionHandle!, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>!>! body, MongoDB.Driver.TransactionOptions? transactionOptions = null, MongoDB.Driver.ClientSessionOptions? sessionOptions = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TResult>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateAsAsyncEnumerable(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<MongoDB.Bson.BsonDocument!, MongoDB.Bson.BsonDocument!>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<MongoDB.Bson.BsonDocument!>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateAsAsyncEnumerable<TInput, TOutput>(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<TInput, TOutput>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<TOutput>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateAsync(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<MongoDB.Bson.BsonDocument!, MongoDB.Bson.BsonDocument!>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<MongoDB.Driver.IAsyncCursor<MongoDB.Bson.BsonDocument!>!>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateAsync<TInput, TOutput>(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<TInput, TOutput>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<MongoDB.Driver.IAsyncCursor<TOutput>!>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateSingleAsync(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<MongoDB.Bson.BsonDocument!, MongoDB.Bson.BsonDocument!>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<MongoDB.Bson.BsonDocument?>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateSingleAsync<TInput, TOutput>(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<TInput, TOutput>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TOutput?>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateToListAsync(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<MongoDB.Bson.BsonDocument!, MongoDB.Bson.BsonDocument!>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.List<MongoDB.Bson.BsonDocument!>!>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.AggregateToListAsync<TInput, TOutput>(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.PipelineDefinition<TInput, TOutput>! pipeline, string! collectionName, MongoDB.Driver.AggregateOptions? options = null, MongoDB.Driver.IClientSessionHandle? session = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.List<TOutput>!>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.GetCollection<T>(this MongoDB.Driver.IMongoDatabase! database, string? name = null, System.Func<System.Type!, string!>? naming = null, MongoDB.Driver.MongoCollectionSettings? settings = null) -> MongoDB.Driver.IMongoCollection<T>!
+static Snail.Toolkit.Mongodb.Extensions.MongoDatabaseExtensions.GridFs(this MongoDB.Driver.IMongoDatabase! database, MongoDB.Driver.GridFS.GridFSBucketOptions? options = null) -> MongoDB.Driver.GridFS.IGridFSBucket!
+static Snail.Toolkit.Mongodb.GridFs.GridFsExtensions.FindOneAsync(this MongoDB.Driver.GridFS.IGridFSBucket! bucket, MongoDB.Driver.FilterDefinition<MongoDB.Driver.GridFS.GridFSFileInfo<MongoDB.Bson.ObjectId>!>! filter, MongoDB.Driver.GridFS.GridFSFindOptions<MongoDB.Bson.ObjectId>? options = null, string! contentTypeKey = "ContentType", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Snail.Toolkit.Mongodb.GridFs.GridFsFile?>!
+static Snail.Toolkit.Mongodb.GridFs.GridFsExtensions.FindOneByObjectIdAsync(this MongoDB.Driver.GridFS.IGridFSBucket! bucket, MongoDB.Bson.ObjectId objectId, MongoDB.Driver.GridFS.GridFSFindOptions<MongoDB.Bson.ObjectId>? options = null, string! contentTypeKey = "ContentType", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Snail.Toolkit.Mongodb.GridFs.GridFsFile?>!
+static Snail.Toolkit.Mongodb.GridFs.GridFsExtensions.FindOneByObjectIdAsync(this MongoDB.Driver.GridFS.IGridFSBucket! bucket, string! objectId, MongoDB.Driver.GridFS.GridFSFindOptions<MongoDB.Bson.ObjectId>? options = null, string! contentTypeKey = "ContentType", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Snail.Toolkit.Mongodb.GridFs.GridFsFile?>!
+static Snail.Toolkit.Mongodb.GridFs.GridFsExtensions.OpenDownloadByObjectIdAsync(this MongoDB.Driver.GridFS.IGridFSBucket! bucket, MongoDB.Bson.ObjectId objectId, MongoDB.Driver.GridFS.GridFSDownloadOptions? options = null, string! contentTypeKey = "ContentType", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Snail.Toolkit.Mongodb.GridFs.GridFsDownload?>!
+static Snail.Toolkit.Mongodb.GridFs.GridFsExtensions.OpenDownloadByObjectIdAsync(this MongoDB.Driver.GridFS.IGridFSBucket! bucket, string! objectId, MongoDB.Driver.GridFS.GridFSDownloadOptions? options = null, string! contentTypeKey = "ContentType", System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Snail.Toolkit.Mongodb.GridFs.GridFsDownload?>!
+static Snail.Toolkit.Mongodb.GridFs.GridFsFile.operator !=(Snail.Toolkit.Mongodb.GridFs.GridFsFile? left, Snail.Toolkit.Mongodb.GridFs.GridFsFile? right) -> bool
+static Snail.Toolkit.Mongodb.GridFs.GridFsFile.operator ==(Snail.Toolkit.Mongodb.GridFs.GridFsFile? left, Snail.Toolkit.Mongodb.GridFs.GridFsFile? right) -> bool
+static Snail.Toolkit.Mongodb.Mongo.ApplyConventions(Snail.Toolkit.Mongodb.Configuration.MongoSetup! setup) -> void
+static Snail.Toolkit.Mongodb.Mongo.Client(Snail.Toolkit.Mongodb.Configuration.MongoOptions! options, Snail.Toolkit.Mongodb.Configuration.MongoSetup? setup = null) -> MongoDB.Driver.IMongoClient!
+static Snail.Toolkit.Mongodb.Mongo.Database(Snail.Toolkit.Mongodb.Configuration.MongoOptions! options, Snail.Toolkit.Mongodb.Configuration.MongoSetup? setup = null) -> MongoDB.Driver.IMongoDatabase!
+static Snail.Toolkit.Mongodb.Mongo.GridFs(MongoDB.Driver.IMongoDatabase! database, Snail.Toolkit.Mongodb.Configuration.MongoSetup? setup = null) -> MongoDB.Driver.GridFS.IGridFSBucket!

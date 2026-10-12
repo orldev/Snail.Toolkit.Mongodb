@@ -1,7 +1,6 @@
 global using Xunit;
 using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
-using Snail.Toolkit.Mongodb.Configuration;
 
 namespace Snail.Toolkit.Mongodb.Tests;
 

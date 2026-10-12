@@ -97,18 +97,17 @@ public class TransactionIntegrationTests(MongoReplicaSetFixture fixture)
     {
         var db = fixture.CreateDatabase();
         var collection = db.GetCollection<Order>();
-        var seenMidTransaction = -1L;
+        var seenOutsideTheSession = -1L;
 
         await db.Client.InTransactionAsync(async (session, ct) =>
         {
             await collection.InsertOneAsync(session, new Order { Product = "book" }, cancellationToken: ct);
 
-            // Reads outside the session must not see the uncommitted write.
-            seenMidTransaction = await collection.CountDocumentsAsync(
+            seenOutsideTheSession = await collection.CountDocumentsAsync(
                 Builders<Order>.Filter.Empty, cancellationToken: ct);
         });
 
-        Assert.Equal(0, seenMidTransaction);
+        Assert.Equal(0, seenOutsideTheSession);
         Assert.Equal(1, await collection.CountDocumentsAsync(Builders<Order>.Filter.Empty));
     }
 

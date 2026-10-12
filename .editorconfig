@@ -1,16 +1,20 @@
+# The shared .editorconfig of every Snail library and server built on Snail.Sdk: copied byte for byte, checked by the
+# conformance check. Formatting only. The rules — which style is required, which analyzer fails the build, what a test
+# project is spared — ship in the Snail.Sdk package and change with its version, not with a copy of this file. A
+# repository not yet on Snail.Sdk keeps version 1 of this file, which carried the rules. See docs/standard.md.
+
 root = true
 
-[*.cs]
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
-insert_final_newline = true
-charset = utf-8
 
-# A comparison that does not state its intent is a bug waiting for a different locale.
-dotnet_diagnostic.CA1305.severity = warning
-dotnet_diagnostic.CA1307.severity = warning
-dotnet_diagnostic.CA1310.severity = warning
+[*.{csproj,props,targets,slnx,xml,yml,yaml,json,toml}]
+indent_size = 2
 
-[tests/**.cs]
-# Tests are named Subject_Condition_ExpectedResult, which is the point of the underscores.
-dotnet_diagnostic.CA1707.severity = none
+[*.md]
+trim_trailing_whitespace = false

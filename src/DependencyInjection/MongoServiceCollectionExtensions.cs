@@ -177,7 +177,7 @@ public static class MongoServiceCollectionExtensions
     {
         if (services.Registration(serviceKey) is { } first)
         {
-            if (Disagree(first.SectionName, sectionName))
+            if (AreDifferent(first.SectionName, sectionName))
                 throw new InvalidOperationException(
                     $"MongoDB is already registered{Key(serviceKey)} from configuration section " +
                     $"'{first.SectionName}', and this call names '{sectionName}'. One registration " +
@@ -243,7 +243,7 @@ public static class MongoServiceCollectionExtensions
     /// Two section names that name two databases. A call configuring settings by delegate names none,
     /// and says nothing either way.
     /// </summary>
-    private static bool Disagree(string? first, string? second) =>
+    private static bool AreDifferent(string? first, string? second) =>
         first is not null &&
         second is not null &&
         string.Equals(first, second, StringComparison.OrdinalIgnoreCase) is false;
