@@ -128,6 +128,12 @@ collection name, and threading that through every call site would cost more than
 accepts one call and refuses the rest: as a settable property, two components could each set it and
 whichever ran second won without a word.
 
+The driver builds a new collection object on every `GetCollection` call (about 2.6 KB). Called with
+nothing but the document type, `GetCollection<T>()` keeps that object per database and type, so a
+repository may ask for it per request: the call is then a lookup that allocates nothing. With a name,
+a per-call convention or `MongoCollectionSettings`, every call reaches the driver and builds a new
+one — hold such a collection in a field.
+
 Filters, updates and sorts use the driver's `Builders<T>` directly. There are no aliases for them
 here: they are static, they need no connection, and wrapping them only made query-building code
 depend on something it never used.
@@ -147,6 +153,11 @@ var one = await db.AggregateSingleAsync(pipeline, "orders", cancellationToken: c
 including when enumeration breaks out early. `AggregateSingleAsync` returns `null` for no match and
 throws when the pipeline yields more than one document. `AggregateAsync` still returns the raw
 `IAsyncCursor<T>` when you want it — that one is yours to dispose.
+
+The helpers keep the collection they read per database, document type and name, so the driver's
+collection object (about 2.6 KB) is built on the first call rather than on every one. Names made per
+tenant or per day are fine: past 256 names a database stops keeping new ones and the driver builds
+those per call, as it always did.
 
 A pipeline reshapes documents, so input and output are separate type parameters. A `$lookup` plus
 `$project` usually yields a shape with no model of its own, and there are two ways to say that:
@@ -228,7 +239,8 @@ timeout — surface as exceptions rather than as a miss. The `string` overloads 
 `ArgumentException` on a malformed identifier; for untrusted input use `ObjectId.TryParse` and the
 `ObjectId` overload. The metadata key defaults to `ContentType` and can be overridden per call.
 
-Without DI, or for a second bucket in the same database, `db.GridFs()` builds one.
+Without DI, or for a second bucket in the same database, `db.GridFs()` builds one — about 4.7 KB
+and a check of the indexes on its first upload, so build it once and keep it.
 
 ### Health checks
 
@@ -243,6 +255,16 @@ a name, a failure status and tags.
 The probe is deliberately not `ping`: MongoDB answers a ping without authentication, so a connection
 string that has lost its credentials passes a ping check while every query fails with `requires
 authentication`. The check has to run something the server refuses to an unauthenticated client.
+
+### Native AOT and trimming
+
+The library is **not** for a Native AOT or trimmed application, and does not declare itself so. The
+reason is its dependency rather than its own code: MongoDB.Driver and MongoDB.Bson 3.10 are not
+trim- or AOT-safe. A native publish of a probe over this library warns IL2104 and IL3053 for both
+assemblies, and the published executable then fails at run time — BSON class maps build serializers
+by reflection and end in a `MissingMethodException`. Suppressing those warnings would hide a crash,
+not prevent one. Use the library in a JIT application; it becomes a candidate for native use when
+the driver itself supports it.
 
 ### Tests
 

@@ -34,6 +34,19 @@ public class MongoNamingTests
         Assert.Equal("PageOfPairOfOrderAndInt32", MongoNaming.ForType(typeof(Page<Pair<Order, int>>)));
     }
 
+    /// <summary>
+    /// A generic type's name is unwrapped once and kept; every later caller, from any thread, gets the same name.
+    /// </summary>
+    [Fact]
+    public void ForType_FromManyThreadsAtOnce_NamesAGenericTypeAlike()
+    {
+        var names = new string[64];
+
+        Parallel.For(0, names.Length, n => names[n] = MongoNaming.ForType(typeof(Pair<Page<Order>, long>)));
+
+        Assert.All(names, name => Assert.Equal("PairOfPageOfOrderAndInt64", name));
+    }
+
     [Fact]
     public void ForType_WithNull_ThrowsArgumentNullException()
     {

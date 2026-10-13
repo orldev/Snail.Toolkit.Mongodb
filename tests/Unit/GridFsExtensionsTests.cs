@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using MongoDB.Driver.GridFS;
 
@@ -105,5 +106,42 @@ public class GridFsExtensionsTests
 
         Assert.Equal("attachments", bucket.Options.BucketName);
         Assert.Equal(1024, bucket.Options.ChunkSizeBytes);
+    }
+
+    [Fact]
+    public async Task FindOneByObjectIdAsync_SendsTheFilterTheDriverRendersForTheId()
+    {
+        var id = ObjectId.GenerateNewId();
+        var serializer = BsonSerializer.LookupSerializer<GridFSFileInfo<ObjectId>>();
+        var arguments = new RenderArgs<GridFSFileInfo<ObjectId>>(serializer, BsonSerializer.SerializerRegistry);
+        BsonDocument? sent = null;
+
+        var bucket = Stub.Of<IGridFSBucket>((method, args) =>
+        {
+            Assert.Equal(nameof(IGridFSBucket.FindAsync), method.Name);
+            sent = ((FilterDefinition<GridFSFileInfo<ObjectId>>)args[0]!).Render(arguments);
+
+            return Task.FromResult<IAsyncCursor<GridFSFileInfo<ObjectId>>>(new NoFiles());
+        });
+
+        var found = await bucket.FindOneByObjectIdAsync(id);
+
+        var expected = Builders<GridFSFileInfo<ObjectId>>.Filter.Eq(x => x.Id, id).Render(arguments);
+        Assert.Null(found);
+        Assert.Equal(expected.ToBson(), sent!.ToBson());
+    }
+
+    /// <summary>A file lookup that matched nothing.</summary>
+    private sealed class NoFiles : IAsyncCursor<GridFSFileInfo<ObjectId>>
+    {
+        public IEnumerable<GridFSFileInfo<ObjectId>> Current => [];
+
+        public bool MoveNext(CancellationToken cancellationToken = default) => false;
+
+        public Task<bool> MoveNextAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
+
+        public void Dispose()
+        {
+        }
     }
 }

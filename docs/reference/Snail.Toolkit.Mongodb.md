@@ -10,9 +10,9 @@ The driver's types, built from settings.
 
 | Member | Summary |
 | --- | --- |
-| `IGridFSBucket GridFs(IMongoDatabase database, MongoSetup setup = null)` | A GridFS bucket over the given database. |
-| `IMongoClient Client(MongoOptions options, MongoSetup setup = null)` | A client for the given settings. |
-| `IMongoDatabase Database(MongoOptions options, MongoSetup setup = null)` | The configured database, off a client built for the given settings. |
+| `IGridFSBucket GridFs(IMongoDatabase database, MongoSetup? setup = null)` | A GridFS bucket over the given database. |
+| `IMongoClient Client(MongoOptions options, MongoSetup? setup = null)` | A client for the given settings. |
+| `IMongoDatabase Database(MongoOptions options, MongoSetup? setup = null)` | The configured database, off a client built for the given settings. |
 | `void ApplyConventions(MongoSetup setup)` | Registers the configured conventions in the driver's process-global registry, once per name. |
 
 ## Snail.Toolkit.Mongodb.Configuration
@@ -34,8 +34,8 @@ Settings used to connect to a MongoDB database.
 | Member | Summary |
 | --- | --- |
 | `MongoOptions()` |  |
-| `string Connection { get; set; }` | The MongoDB connection string, for example `mongodb://user:password@localhost:27017`. |
-| `string Database { get; set; }` | The name of the database to use. |
+| `string? Connection { get; set; }` | The MongoDB connection string, for example `mongodb://user:password@localhost:27017`. |
+| `string? Database { get; set; }` | The name of the database to use. |
 
 ### class MongoOptionsValidator
 
@@ -45,7 +45,7 @@ Validates `MongoOptions`. The implementation is generated from the data annotati
 | --- | --- |
 | `MongoOptionsValidator Instance { get; }` | A shared instance, used to validate options built outside the container. |
 | `MongoOptionsValidator()` |  |
-| `ValidateOptionsResult Validate(string name, MongoOptions options)` | Validates a specific named options instance (or all when `name` is `null`). |
+| `ValidateOptionsResult Validate(string? name, MongoOptions options)` | Validates a specific named options instance (or all when `name` is `null`). |
 | `void ThrowIfInvalid(MongoOptions options, string name = "")` | Validates the options and throws when they are incomplete. |
 
 ### class MongoSetup
@@ -54,9 +54,9 @@ Knobs that cannot come from configuration — delegates and driver option object
 
 | Member | Summary |
 | --- | --- |
-| `Action<ConventionPack> Conventions { get; set; }` | Fills a `ConventionPack` applied to every mapped type — camel casing, ignoring extra elements, enum representation, and so on. |
-| `Action<MongoClientSettings> ConfigureClient { get; set; }` | A hook over the `MongoClientSettings` parsed from the connection string, for TLS, timeouts, pool sizing, the LINQ provider, or subscribing to cluster and command events — which is how you wire up tracing or metrics. |
-| `GridFSBucketOptions GridFsBucket { get; set; }` | GridFS bucket options, such as bucket name or chunk size. |
+| `Action<ConventionPack>? Conventions { get; set; }` | Fills a `ConventionPack` applied to every mapped type — camel casing, ignoring extra elements, enum representation, and so on. |
+| `Action<MongoClientSettings>? ConfigureClient { get; set; }` | A hook over the `MongoClientSettings` parsed from the connection string, for TLS, timeouts, pool sizing, the LINQ provider, or subscribing to cluster and command events — which is how you wire up tracing or metrics. |
+| `GridFSBucketOptions? GridFsBucket { get; set; }` | GridFS bucket options, such as bucket name or chunk size. |
 | `MongoSetup()` |  |
 | `const string DefaultConventionPackName` | The name under which `Conventions` are registered in the driver's global `ConventionRegistry`. |
 | `string ConventionPackName { get; set; }` | The name `Conventions` are registered under. |
@@ -69,7 +69,7 @@ Registers the MongoDB health check.
 
 | Member | Summary |
 | --- | --- |
-| `IHealthChecksBuilder AddKeyedMongodb(this IHealthChecksBuilder builder, string serviceKey, string name = null, HealthStatus? failureStatus = null, string[] tags)` | Adds a check over a keyed `IMongoDatabase` registered by `AddKeyedMongodb`. |
+| `IHealthChecksBuilder AddKeyedMongodb(this IHealthChecksBuilder builder, string serviceKey, string? name = null, HealthStatus? failureStatus = null, string[] tags)` | Adds a check over a keyed `IMongoDatabase` registered by `AddKeyedMongodb`. |
 | `IHealthChecksBuilder AddMongodb(this IHealthChecksBuilder builder, string name = "Mongodb", HealthStatus? failureStatus = null, string[] tags)` | Adds a check over the `IMongoDatabase` registered by `AddMongodb`. |
 | `const string DefaultName` | The name the check is registered under when none is given. |
 
@@ -79,10 +79,10 @@ Registers the MongoDB driver's own types from configuration.
 
 | Member | Summary |
 | --- | --- |
-| `IServiceCollection AddKeyedMongodb(this IServiceCollection services, string serviceKey, Action<MongoOptions> options, Action<MongoSetup> setup = null)` | Registers the MongoDB driver's types under a key, so that one application can talk to several databases side by side. |
-| `IServiceCollection AddKeyedMongodb(this IServiceCollection services, string serviceKey, IConfiguration configuration, string sectionName = "mongodb", Action<MongoSetup> setup = null)` | Registers the MongoDB driver's types under a key, so that one application can talk to several databases side by side. |
-| `IServiceCollection AddMongodb(this IServiceCollection services, Action<MongoOptions> options, Action<MongoSetup> setup = null)` | Registers the MongoDB driver's types, configuring `MongoOptions` with a delegate. |
-| `IServiceCollection AddMongodb(this IServiceCollection services, IConfiguration configuration, string sectionName = "mongodb", Action<MongoSetup> setup = null)` | Registers the MongoDB driver's types, binding `MongoOptions` from configuration. |
+| `IServiceCollection AddKeyedMongodb(this IServiceCollection services, string serviceKey, Action<MongoOptions> options, Action<MongoSetup>? setup = null)` | Registers the MongoDB driver's types under a key, so that one application can talk to several databases side by side. |
+| `IServiceCollection AddKeyedMongodb(this IServiceCollection services, string serviceKey, IConfiguration configuration, string sectionName = "mongodb", Action<MongoSetup>? setup = null)` | Registers the MongoDB driver's types under a key, so that one application can talk to several databases side by side. |
+| `IServiceCollection AddMongodb(this IServiceCollection services, Action<MongoOptions> options, Action<MongoSetup>? setup = null)` | Registers the MongoDB driver's types, configuring `MongoOptions` with a delegate. |
+| `IServiceCollection AddMongodb(this IServiceCollection services, IConfiguration configuration, string sectionName = "mongodb", Action<MongoSetup>? setup = null)` | Registers the MongoDB driver's types, binding `MongoOptions` from configuration. |
 | `const string DefaultSectionName` | The configuration section read when none is named. |
 
 ## Snail.Toolkit.Mongodb.Diagnostics
@@ -104,8 +104,8 @@ Transaction helpers over the driver's own `IMongoClient`.
 
 | Member | Summary |
 | --- | --- |
-| `Task InTransactionAsync(this IMongoClient client, Func<IClientSessionHandle, CancellationToken, Task> body, TransactionOptions transactionOptions = null, ClientSessionOptions sessionOptions = null, CancellationToken cancellationToken = default)` | Runs `body` inside a transaction, retrying it on transient transaction errors and committing when it returns. |
-| `Task<TResult> InTransactionAsync<TResult>(this IMongoClient client, Func<IClientSessionHandle, CancellationToken, Task<TResult>> body, TransactionOptions transactionOptions = null, ClientSessionOptions sessionOptions = null, CancellationToken cancellationToken = default)` | Runs `body` inside a transaction, retrying it on transient transaction errors and committing when it returns. |
+| `Task InTransactionAsync(this IMongoClient client, Func<IClientSessionHandle, CancellationToken, Task> body, TransactionOptions? transactionOptions = null, ClientSessionOptions? sessionOptions = null, CancellationToken cancellationToken = default)` | Runs `body` inside a transaction, retrying it on transient transaction errors and committing when it returns. |
+| `Task<TResult> InTransactionAsync<TResult>(this IMongoClient client, Func<IClientSessionHandle, CancellationToken, Task<TResult>> body, TransactionOptions? transactionOptions = null, ClientSessionOptions? sessionOptions = null, CancellationToken cancellationToken = default)` | Runs `body` inside a transaction, retrying it on transient transaction errors and committing when it returns. |
 
 ### static class MongoDatabaseExtensions
 
@@ -113,16 +113,16 @@ Collection access and aggregation helpers over the driver's own `IMongoDatabase`
 
 | Member | Summary |
 | --- | --- |
-| `IAsyncEnumerable<BsonDocument> AggregateAsAsyncEnumerable(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and streams the documents, disposing the cursor when enumeration ends — including when the consumer breaks out early. |
-| `IAsyncEnumerable<TOutput> AggregateAsAsyncEnumerable<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and streams the documents, disposing the cursor when enumeration ends — including when the consumer breaks out early. |
-| `IGridFSBucket GridFs(this IMongoDatabase database, GridFSBucketOptions options = null)` | Gets a GridFS bucket over this database. |
-| `IMongoCollection<T> GetCollection<T>(this IMongoDatabase database, string name = null, Func<Type, string> naming = null, MongoCollectionSettings settings = null)` | Gets a collection, naming it after the document type when no name is given. |
-| `Task<BsonDocument> AggregateSingleAsync(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Returns the only document of a pipeline, or `null` if it yields none. |
-| `Task<IAsyncCursor<BsonDocument>> AggregateAsync(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and returns the raw cursor. |
-| `Task<IAsyncCursor<TOutput>> AggregateAsync<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and returns the raw cursor. |
-| `Task<List<BsonDocument>> AggregateToListAsync(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and buffers every document, disposing the cursor. |
-| `Task<List<TOutput>> AggregateToListAsync<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and buffers every document, disposing the cursor. |
-| `Task<TOutput> AggregateSingleAsync<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions options = null, IClientSessionHandle session = null, CancellationToken cancellationToken = default)` | Returns the only document of a pipeline, or the default value if it yields none. |
+| `IAsyncEnumerable<BsonDocument> AggregateAsAsyncEnumerable(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and streams the documents, disposing the cursor when enumeration ends — including when the consumer breaks out early. |
+| `IAsyncEnumerable<TOutput> AggregateAsAsyncEnumerable<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and streams the documents, disposing the cursor when enumeration ends — including when the consumer breaks out early. |
+| `IGridFSBucket GridFs(this IMongoDatabase database, GridFSBucketOptions? options = null)` | Gets a GridFS bucket over this database. |
+| `IMongoCollection<T> GetCollection<T>(this IMongoDatabase database, string? name = null, Func<Type, string>? naming = null, MongoCollectionSettings? settings = null)` | Gets a collection, naming it after the document type when no name is given. |
+| `Task<BsonDocument?> AggregateSingleAsync(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Returns the only document of a pipeline, or `null` if it yields none. |
+| `Task<IAsyncCursor<BsonDocument>> AggregateAsync(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and returns the raw cursor. |
+| `Task<IAsyncCursor<TOutput>> AggregateAsync<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and returns the raw cursor. |
+| `Task<List<BsonDocument>> AggregateToListAsync(this IMongoDatabase database, PipelineDefinition<BsonDocument, BsonDocument> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and buffers every document, disposing the cursor. |
+| `Task<List<TOutput>> AggregateToListAsync<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Runs an aggregation pipeline and buffers every document, disposing the cursor. |
+| `Task<TOutput?> AggregateSingleAsync<TInput, TOutput>(this IMongoDatabase database, PipelineDefinition<TInput, TOutput> pipeline, string collectionName, AggregateOptions? options = null, IClientSessionHandle? session = null, CancellationToken cancellationToken = default)` | Returns the only document of a pipeline, or the default value if it yields none. |
 
 ## Snail.Toolkit.Mongodb.GridFs
 
@@ -137,8 +137,8 @@ An open GridFS download: the content stream plus the metadata that came with it,
 | `Stream Stream { get; }` | The content of the file. Readable, seekable, and owned by this instance. |
 | `ValueTask DisposeAsync()` | Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources asynchronously. |
 | `long Length { get; }` | The length of the file in bytes. |
-| `string ContentType { get; }` | The content type taken from the file metadata, or `null` when the file carries no such entry or the entry is not a string. |
 | `string Filename { get; }` | The name the file was stored under. |
+| `string? ContentType { get; }` | The content type taken from the file metadata, or `null` when the file carries no such entry or the entry is not a string. |
 | `void Dispose()` | Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources. |
 
 ### static class GridFsExtensions
@@ -147,11 +147,11 @@ Lookup and download helpers over `IGridFSBucket` that return the file and its co
 
 | Member | Summary |
 | --- | --- |
-| `Task<GridFsDownload> OpenDownloadByObjectIdAsync(this IGridFSBucket bucket, ObjectId objectId, GridFSDownloadOptions options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Opens the content of a file together with its metadata, in a single round trip. |
-| `Task<GridFsDownload> OpenDownloadByObjectIdAsync(this IGridFSBucket bucket, string objectId, GridFSDownloadOptions options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Opens the content of a file together with its metadata, in a single round trip. |
-| `Task<GridFsFile> FindOneAsync(this IGridFSBucket bucket, FilterDefinition<GridFSFileInfo<ObjectId>> filter, GridFSFindOptions<ObjectId> options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Returns the first file matching a filter, without fetching its content. |
-| `Task<GridFsFile> FindOneByObjectIdAsync(this IGridFSBucket bucket, ObjectId objectId, GridFSFindOptions<ObjectId> options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Returns the file with the given identifier, without fetching its content. |
-| `Task<GridFsFile> FindOneByObjectIdAsync(this IGridFSBucket bucket, string objectId, GridFSFindOptions<ObjectId> options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Returns the file with the given identifier, without fetching its content. |
+| `Task<GridFsDownload?> OpenDownloadByObjectIdAsync(this IGridFSBucket bucket, ObjectId objectId, GridFSDownloadOptions? options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Opens the content of a file together with its metadata, in a single round trip. |
+| `Task<GridFsDownload?> OpenDownloadByObjectIdAsync(this IGridFSBucket bucket, string objectId, GridFSDownloadOptions? options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Opens the content of a file together with its metadata, in a single round trip. |
+| `Task<GridFsFile?> FindOneAsync(this IGridFSBucket bucket, FilterDefinition<GridFSFileInfo<ObjectId>> filter, GridFSFindOptions<ObjectId>? options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Returns the first file matching a filter, without fetching its content. |
+| `Task<GridFsFile?> FindOneByObjectIdAsync(this IGridFSBucket bucket, ObjectId objectId, GridFSFindOptions<ObjectId>? options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Returns the file with the given identifier, without fetching its content. |
+| `Task<GridFsFile?> FindOneByObjectIdAsync(this IGridFSBucket bucket, string objectId, GridFSFindOptions<ObjectId>? options = null, string contentTypeKey = "ContentType", CancellationToken cancellationToken = default)` | Returns the file with the given identifier, without fetching its content. |
 | `const string DefaultContentTypeKey` | The metadata key holding the content type of a file. |
 
 ### class GridFsFile
@@ -161,8 +161,8 @@ The result of a GridFS lookup: the file that was found, together with the conten
 | Member | Summary |
 | --- | --- |
 | `GridFSFileInfo<ObjectId> File { get; init; }` | The file information. |
-| `GridFsFile(GridFSFileInfo<ObjectId> File, string ContentType)` | The result of a GridFS lookup: the file that was found, together with the content type read from its metadata. |
+| `GridFsFile(GridFSFileInfo<ObjectId> File, string? ContentType)` | The result of a GridFS lookup: the file that was found, together with the content type read from its metadata. |
 | `ObjectId Id { get; }` | The identifier of the file. |
 | `long Length { get; }` | The length of the file in bytes. |
-| `string ContentType { get; init; }` | The content type taken from the file metadata, or `null` when the file carries no such entry or the entry is not a string. A missing content type does not mean the file is missing. |
 | `string Filename { get; }` | The name the file was stored under. |
+| `string? ContentType { get; init; }` | The content type taken from the file metadata, or `null` when the file carries no such entry or the entry is not a string. A missing content type does not mean the file is missing. |

@@ -23,6 +23,9 @@ public class CollectionBenchmarks
     {
         _client = new MongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=100");
         _database = _client.GetDatabase("shop");
+
+        Verify<Order>("Order");
+        Verify<Envelope<Order>>("EnvelopeOfOrder");
     }
 
     /// <summary>Releases the client.</summary>
@@ -48,4 +51,19 @@ public class CollectionBenchmarks
     /// <returns>The collection.</returns>
     [Benchmark(Description = "GetCollection<Envelope<Order>>()")]
     public object CollectionGeneric() => _database.GetCollection<Envelope<Order>>();
+
+    /// <summary>The collection of a plain type, off a database the client builds per call.</summary>
+    /// <returns>The collection.</returns>
+    [Benchmark(Description = "GetDatabase().GetCollection<Order>()")]
+    public object CollectionOfNewDatabase() => _client.GetDatabase("shop").GetCollection<Order>();
+
+    /// <summary>Fails the run unless the extension hands out the collection the driver builds under the conventional name.</summary>
+    private void Verify<T>(string name)
+    {
+        var expected = _database.GetCollection<T>(name, settings: null);
+        var actual = _database.GetCollection<T>();
+
+        if (!actual.CollectionNamespace.Equals(expected.CollectionNamespace) || !actual.Settings.Equals(expected.Settings))
+            throw new InvalidOperationException($"GetCollection<{typeof(T).Name}>() is not the driver's collection '{name}'.");
+    }
 }

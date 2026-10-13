@@ -2,8 +2,6 @@
 
     <!-- The rest of the build — language, nullable, docs, analyzers, warnings as errors — is Snail.Sdk's (global.json). -->
     <PropertyGroup>
-        <!-- The version a build without a tag carries: the last release, so the package validation's version check holds. A release sets its own from the tag. -->
-        <VersionPrefix>1.1.0</VersionPrefix>
         <!-- The last release on NuGet: a pack fails on any change that would break a user of it. Raised with each release. -->
         <SnailPackageBaseline>1.1.0</SnailPackageBaseline>
     </PropertyGroup>

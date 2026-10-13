@@ -36,10 +36,7 @@ public static class MongoClientExtensions
         using var session = await client.StartSessionAsync(sessionOptions, cancellationToken)
             .ConfigureAwait(false);
 
-        return await session.WithTransactionAsync(
-                async (handle, token) => await body(handle, token).ConfigureAwait(false),
-                transactionOptions,
-                cancellationToken)
+        return await session.WithTransactionAsync(body, transactionOptions, cancellationToken)
             .ConfigureAwait(false);
     }
 

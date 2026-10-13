@@ -25,6 +25,38 @@ public class MongoDatabaseExtensionsTests
             Database().GetCollection<BsonDocument>().CollectionNamespace.CollectionName);
     }
 
+    /// <summary>A repository asks for its collection per request; the driver would build a new one every time.</summary>
+    [Fact]
+    public void GetCollection_WithoutName_HandsBackTheSameCollectionEachTime()
+    {
+        var database = Database();
+
+        Assert.Same(database.GetCollection<BsonDocument>(), database.GetCollection<BsonDocument>());
+    }
+
+    [Fact]
+    public void GetCollection_WithoutName_IsTheCollectionTheDriverBuilds()
+    {
+        var database = Database();
+        var built = database.GetCollection<BsonDocument>(nameof(BsonDocument));
+
+        var held = database.GetCollection<BsonDocument>();
+
+        Assert.Equal(built.CollectionNamespace, held.CollectionNamespace);
+        Assert.Equal(built.Settings, held.Settings);
+        Assert.Same(built.DocumentSerializer, held.DocumentSerializer);
+    }
+
+    [Fact]
+    public void GetCollection_WithoutName_KeepsEachDatabaseApart()
+    {
+        var orders = Database("orders").GetCollection<BsonDocument>();
+        var audit = Database("audit").GetCollection<BsonDocument>();
+
+        Assert.Equal("orders.BsonDocument", orders.CollectionNamespace.FullName);
+        Assert.Equal("audit.BsonDocument", audit.CollectionNamespace.FullName);
+    }
+
     [Fact]
     public void GetCollection_WithName_UsesTheGivenName()
     {
@@ -177,6 +209,28 @@ public class MongoDatabaseExtensionsTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => database.AggregateToListAsync(pipeline, "c"));
     }
 
+    /// <summary>
+    /// A caller that starts an aggregation and awaits it later sees the refusal in the task, not at the call.
+    /// </summary>
+    [Fact]
+    public async Task Aggregate_WhenDatabaseIsNull_FaultsTheTaskRatherThanThrowing()
+    {
+        IMongoDatabase database = null!;
+        PipelineDefinition<BsonDocument, BsonDocument> pipeline =
+            new BsonDocument[] { new("$match", new BsonDocument()) };
+
+        Task[] started =
+        [
+            database.AggregateAsync(pipeline, "c"),
+            database.AggregateSingleAsync(pipeline, "c"),
+            database.AggregateToListAsync(pipeline, "c")
+        ];
+        var streamed = database.AggregateAsAsyncEnumerable(pipeline, "c").GetAsyncEnumerator();
+
+        Assert.All(started, task => Assert.IsType<ArgumentNullException>(task.Exception?.InnerException));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await streamed.MoveNextAsync());
+    }
+
     [Fact]
     public async Task InTransactionAsync_WhenClientIsNull_ThrowsArgumentNullException()
     {
@@ -184,6 +238,57 @@ public class MongoDatabaseExtensionsTests
 
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => client.InTransactionAsync((_, _) => Task.FromResult(1)));
+    }
+
+    /// <summary>
+    /// Work that sends nothing starts and commits a transaction without a server, so the driver's real session,
+    /// retry loop and commit run here.
+    /// </summary>
+    [Fact]
+    public async Task InTransactionAsync_WithWorkThatSendsNothing_RunsItOnceInsideATransaction()
+    {
+        using var client = new MongoClient(Given.UnreachableConnection);
+        var runs = new List<bool>();
+
+        var result = await client.InTransactionAsync((session, _) =>
+        {
+            runs.Add(session.IsInTransaction);
+
+            return Task.FromResult(42);
+        });
+
+        await client.InTransactionAsync((session, _) =>
+        {
+            runs.Add(session.IsInTransaction);
+
+            return Task.CompletedTask;
+        });
+
+        Assert.Equal(42, result);
+        Assert.Equal([true, true], runs);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task InTransactionAsync_WhenTheBodyFailsTransiently_RunsItAgain(bool isThrownBeforeATask)
+    {
+        using var client = new MongoClient(Given.UnreachableConnection);
+        var runs = 0;
+
+        Func<IClientSessionHandle, CancellationToken, Task<int>> failingAtOnce = (_, _) =>
+            ++runs == 1 ? throw Transient() : Task.FromResult(runs);
+
+        Func<IClientSessionHandle, CancellationToken, Task<int>> failingLater = async (_, _) =>
+        {
+            await Task.Yield();
+
+            return ++runs == 1 ? throw Transient() : runs;
+        };
+
+        var result = await client.InTransactionAsync(isThrownBeforeATask ? failingAtOnce : failingLater);
+
+        Assert.Equal(2, result);
     }
 
     [Fact]
@@ -290,5 +395,13 @@ public class MongoDatabaseExtensionsTests
     public void CreateGridFsBucket_WhenDatabaseIsNull_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>(() => Mongo.GridFs(null!));
+    }
+
+    private static MongoException Transient()
+    {
+        var exception = new MongoException("The primary stepped down.");
+        exception.AddErrorLabel("TransientTransactionError");
+
+        return exception;
     }
 }
