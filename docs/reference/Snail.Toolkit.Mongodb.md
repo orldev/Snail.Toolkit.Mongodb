@@ -69,8 +69,10 @@ Registers the MongoDB health check.
 
 | Member | Summary |
 | --- | --- |
-| `IHealthChecksBuilder AddKeyedMongodb(this IHealthChecksBuilder builder, string serviceKey, string? name = null, HealthStatus? failureStatus = null, string[] tags)` | Adds a check over a keyed `IMongoDatabase` registered by `AddKeyedMongodb`. |
-| `IHealthChecksBuilder AddMongodb(this IHealthChecksBuilder builder, string name = "Mongodb", HealthStatus? failureStatus = null, string[] tags)` | Adds a check over the `IMongoDatabase` registered by `AddMongodb`. |
+| `IHealthChecksBuilder AddKeyedMongodb(this IHealthChecksBuilder builder, string serviceKey, string? name = null, HealthStatus? failureStatus = null, TimeSpan? timeout = null, string[] tags)` | Adds a check over a keyed `IMongoDatabase` registered by `AddKeyedMongodb`. |
+| `IHealthChecksBuilder AddKeyedMongodb(this IHealthChecksBuilder builder, string serviceKey, string? name, HealthStatus? failureStatus, string[] tags)` | Adds a check over a keyed `IMongoDatabase` registered by `AddKeyedMongodb`, without a timeout. |
+| `IHealthChecksBuilder AddMongodb(this IHealthChecksBuilder builder, string name = "Mongodb", HealthStatus? failureStatus = null, TimeSpan? timeout = null, string[] tags)` | Adds a check over the `IMongoDatabase` registered by `AddMongodb`. |
+| `IHealthChecksBuilder AddMongodb(this IHealthChecksBuilder builder, string name, HealthStatus? failureStatus, string[] tags)` | Adds a check over the `IMongoDatabase` registered by `AddMongodb`, without a timeout. |
 | `const string DefaultName` | The name the check is registered under when none is given. |
 
 ### static class MongoServiceCollectionExtensions

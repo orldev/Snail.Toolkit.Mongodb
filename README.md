@@ -64,10 +64,16 @@ builder.Services.Configure<MongoOptions>(o => o.Database = "tenant-42");
 
 Validation is generated from the data annotations on `MongoOptions` — no reflection at run time — and
 runs at host startup via `ValidateOnStart`. A missing setting refuses to bring the process up, with a
-message naming the property, rather than surfacing on the first query. A connection string the driver
-cannot parse and a database name MongoDB will not accept are refused there too: present is not the
-same as usable. `ValidateOnStart` needs a host to run in — outside one, a bare `ServiceCollection` or
-a console app, the same failure surfaces on the first resolve instead.
+message naming the property, rather than surfacing on the first query. Present is not the same as
+usable, so three more things are refused there, each with the driver's reason in the message: a
+connection string the driver cannot parse, a database name the server will not accept (at most 63
+characters, none of `/ \ . " $`, no space, no null character — what `mongo:8.0` refuses, which is more
+than the driver checks), and a connection string the driver parses and then refuses when the client is
+built, such as `connectTimeoutMS=-5`. That last one is caught by building every registered client when
+the host starts; building one opens no connection, but an SRV connection string is resolved then, so
+the start waits for DNS — about a second for a name that does not resolve. `ValidateOnStart` needs a
+host to run in — outside one, a bare `ServiceCollection` or a console app, the same failures surface on
+the first resolve instead.
 
 Anything configuration cannot carry — delegates and driver option objects — goes in `setup`:
 
@@ -85,7 +91,10 @@ client in the process, not just this registration, and `ConventionPackName` does
 two packs under two names both land on the same document type. They are registered while the
 container is being built, because a BSON class map is frozen the first time its type is serialised
 and a convention arriving after that is silently ignored. A pack name is registered once per
-process; the first registration wins.
+process, and the first registration wins: calling `AddMongodb` twice with the same setup is a no-op,
+while a second registration — another key, say — whose pack would land under a name already taken is
+refused, naming the key and the pack, rather than having its conventions dropped. Give each key's
+conventions a `ConventionPackName` of their own.
 
 Outside DI — a console app, a migration, a test — build the same things directly:
 
@@ -202,7 +211,8 @@ await client.InTransactionAsync(async (session, ct) =>
 
 The body is retried on transient transaction errors and committed when it returns; throwing rolls
 back. Pass the `session` to every operation that must take part — work that ignores it is not in the
-transaction. Requires a replica set or sharded cluster. A class holding only a database can reach the
+transaction. A token cancelled before the call does not run the body; one cancelled during a retry
+stops it. Requires a replica set or sharded cluster. A class holding only a database can reach the
 client through `db.Client`.
 
 The aggregation helpers take the session too, so a read inside a transaction sees its own uncommitted
@@ -245,12 +255,19 @@ and a check of the indexes on its first upload, so build it once and keep it.
 ### Health checks
 
 ```c#
-builder.Services.AddHealthChecks().AddMongodb();
-builder.Services.AddHealthChecks().AddKeyedMongodb("orders");
+builder.Services.AddHealthChecks().AddMongodb(timeout: TimeSpan.FromSeconds(1));
+builder.Services.AddHealthChecks().AddKeyedMongodb("orders", timeout: TimeSpan.FromSeconds(1));
 ```
 
 Runs `listCollections` against the registered database and reports the exception on failure. Accepts
-a name, a failure status and tags.
+a name, a failure status, a timeout and tags. A database that is registered but cannot be built — a
+client hook that throws, settings refused outside a host — is reported as that check's own unhealthy
+entry, with the exception, rather than failing the whole endpoint.
+
+Give it a timeout. The driver's defaults wait 30 s for a server that accepts the connection and never
+answers, while a liveness probe allows about one second; a socket that stalls after the handshake has
+no timeout at all unless the connection string sets `socketTimeoutMS`. The timeout cancels the command
+and the check reports unhealthy.
 
 The probe is deliberately not `ping`: MongoDB answers a ping without authentication, so a connection
 string that has lost its credentials passes a ping check while every query fails with `requires

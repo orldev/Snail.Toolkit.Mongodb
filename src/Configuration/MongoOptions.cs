@@ -44,12 +44,15 @@ public sealed partial class MongoOptionsValidator : IValidateOptions<MongoOption
     /// <param name="options">The options to validate.</param>
     /// <param name="name">The name of the options instance, used in the error message.</param>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is null.</exception>
-    /// <exception cref="OptionsValidationException">A required setting is missing.</exception>
+    /// <exception cref="OptionsValidationException">A required setting is missing, or present and unusable.</exception>
     public static void ThrowIfInvalid(MongoOptions options, string name = "")
     {
         ArgumentNullException.ThrowIfNull(options);
 
         var result = Instance.Validate(name, options);
+
+        if (result.Succeeded)
+            result = MongoUsabilityValidator.Instance.Validate(name, options);
 
         if (result.Failed)
             throw new OptionsValidationException(name, typeof(MongoOptions), result.Failures);

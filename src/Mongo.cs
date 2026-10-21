@@ -85,24 +85,41 @@ public static class Mongo
     /// </remarks>
     /// <param name="setup">Supplies the conventions and the name to register them under.</param>
     /// <exception cref="ArgumentNullException"><paramref name="setup"/> is null.</exception>
-    public static void ApplyConventions(MongoSetup setup)
+    public static void ApplyConventions(MongoSetup setup) => TryApplyConventions(setup);
+
+    /// <summary>
+    /// Registers the configured conventions once per name, and says whether this call was the one that did.
+    /// </summary>
+    /// <remarks>
+    /// The registration path needs the answer: a second registration whose conventions land under a name already
+    /// taken would have them dropped without a word, and that is a mistake to refuse rather than a repeat to skip.
+    /// </remarks>
+    /// <param name="setup">Supplies the conventions and the name to register them under.</param>
+    /// <returns>
+    /// <see langword="true"/> when there was nothing to register or this call registered it; <see langword="false"/>
+    /// when the name was already taken.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="setup"/> is null.</exception>
+    internal static bool TryApplyConventions(MongoSetup setup)
     {
         ArgumentNullException.ThrowIfNull(setup);
 
-        if (setup.Conventions is null) return;
+        if (setup.Conventions is null) return true;
 
         ArgumentException.ThrowIfNullOrWhiteSpace(setup.ConventionPackName);
 
         var pack = new ConventionPack();
         setup.Conventions.Invoke(pack);
 
-        if (pack.Conventions.Any() is false) return;
+        if (pack.Conventions.Any() is false) return true;
 
         lock (ConventionGate)
         {
-            if (AppliedPacks.Add(setup.ConventionPackName) is false) return;
+            if (AppliedPacks.Add(setup.ConventionPackName) is false) return false;
 
             ConventionRegistry.Register(setup.ConventionPackName, pack, _ => true);
+
+            return true;
         }
     }
 }

@@ -12,6 +12,7 @@ namespace Snail.Toolkit.Mongodb.Tests.Integration;
 public sealed class MongoContainerFixture : IAsyncLifetime
 {
     private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:8.0").Build();
+    private readonly List<IMongoClient> _owned = [];
     private IMongoClient? _client;
 
     public string Connection => _container.GetConnectionString();
@@ -21,6 +22,7 @@ public sealed class MongoContainerFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         _client?.Dispose();
+        _owned.ForEach(client => client.Dispose());
 
         await _container.DisposeAsync();
     }
@@ -36,15 +38,34 @@ public sealed class MongoContainerFixture : IAsyncLifetime
     /// <remarks>
     /// Every call used to build its own client, so a suite of sixty tests left sixty connection
     /// pools and their monitoring threads behind — measured at twelve extra threads for sixty
-    /// connected clients. Settings that shape the client still need one of their own.
+    /// connected clients. Settings that shape the client still need one of their own, which the
+    /// fixture disposes with the container.
     /// </remarks>
     public IMongoDatabase CreateDatabase(MongoSetup? setup = null) =>
         setup is null
             ? Client().GetDatabase(NewDatabaseName())
-            : Mongo.Database(new MongoOptions { Connection = Connection, Database = NewDatabaseName() }, setup);
+            : Owned(setup).GetDatabase(NewDatabaseName());
+
+    /// <summary>
+    /// A database of the given name, off the client this fixture owns, through the library's own validation.
+    /// </summary>
+    public IMongoDatabase CreateDatabase(string name)
+    {
+        MongoOptionsValidator.ThrowIfInvalid(new MongoOptions { Connection = Connection, Database = name });
+
+        return Client().GetDatabase(name);
+    }
 
     private IMongoClient Client() =>
         _client ??= Mongo.Client(new MongoOptions { Connection = Connection, Database = NewDatabaseName() });
+
+    private IMongoClient Owned(MongoSetup setup)
+    {
+        var client = Mongo.Client(new MongoOptions { Connection = Connection, Database = NewDatabaseName() }, setup);
+        _owned.Add(client);
+
+        return client;
+    }
 
     public IGridFSBucket CreateGridFs(MongoSetup? setup = null) =>
         Mongo.GridFs(CreateDatabase(setup), setup);

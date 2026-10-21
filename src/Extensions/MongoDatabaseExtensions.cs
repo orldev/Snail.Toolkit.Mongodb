@@ -71,6 +71,12 @@ public static class MongoDatabaseExtensions
     /// A database's table is written once per document type and read without a lock afterwards, so it takes one
     /// lock rather than the default of one per processor, which cost a caller that gets the database from the
     /// client per request some 600 bytes on every call.
+    ///
+    /// The first burst after a cold start asks before anything is held: sixty-four requests at once each built a
+    /// collection and the last writer won, so nine different objects went out for one type. Harmless for an
+    /// immutable collection, but not what this promises, so the first one added is the one every caller gets. Without
+    /// a lambda: one capturing the convention cost 32 bytes on every call, hit or miss, since the closure is made on
+    /// entry.
     /// </remarks>
     /// <param name="database">The database.</param>
     /// <typeparam name="T">The document type.</typeparam>
@@ -83,11 +89,15 @@ public static class MongoDatabaseExtensions
         if (held.TryGetValue(typeof(T), out var conventional) && conventional.Naming.Equals(naming))
             return (IMongoCollection<T>)conventional.Collection;
 
-        var collection = database.GetCollection<T>(Named<T>(naming));
+        var built = new Conventional(naming, database.GetCollection<T>(Named<T>(naming)));
+        var kept = held.GetOrAdd(typeof(T), built);
 
-        held[typeof(T)] = new Conventional(naming, collection);
+        if (kept.Naming.Equals(naming))
+            return (IMongoCollection<T>)kept.Collection;
 
-        return collection;
+        held[typeof(T)] = built;
+
+        return (IMongoCollection<T>)built.Collection;
     }
 
     /// <summary>

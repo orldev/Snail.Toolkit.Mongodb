@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Snail.Toolkit.Mongodb.DependencyInjection;
@@ -138,15 +139,16 @@ public static class MongoServiceCollectionExtensions
                 $"Configuration section '{sectionName}' was not found. Add it, or pass a different section name.");
 
     /// <summary>
-    /// Registers the validator, the setup instance and the three driver types.
+    /// Records the registration, then adds the settings, the setup and the three driver types.
     /// </summary>
     /// <remarks>
     /// One code path serves both the keyed and the unkeyed case: a <see cref="ServiceDescriptor"/>
     /// built with a null key <em>is</em> an unkeyed descriptor, and the key travels into the factory,
-    /// where it doubles as the options name. Construction of the client is deferred to the first
-    /// resolve, so a registration skipped by <c>TryAdd</c> leaves no orphaned connection pool behind.
-    /// Conventions are the exception: they have to reach the driver before any document type is
-    /// serialised, so they are applied here rather than when the client is built.
+    /// where it doubles as the options name. Under a host every client is built when the host starts
+    /// (<see cref="MongoStartup"/>), so a setting the driver refuses only then refuses the host; without
+    /// one, construction waits for the first resolve, so a registration skipped by <c>TryAdd</c> leaves no
+    /// orphaned connection pool behind. Conventions are the exception: they have to reach the driver
+    /// before any document type is serialised, so they are applied here rather than when the client is built.
     ///
     /// A repeated call for the same key keeps the first registration. <c>TryAdd</c> alone did not:
     /// options configuration is additive, so a second call bound its own section over the first
@@ -166,7 +168,8 @@ public static class MongoServiceCollectionExtensions
     /// <param name="configureOptions">Binds or configures the settings.</param>
     /// <param name="setup">Configures delegates and driver option objects.</param>
     /// <exception cref="InvalidOperationException">
-    /// The key is already registered from a different configuration section.
+    /// The key is already registered from a different configuration section, or the conventions of this
+    /// registration land under a pack name an earlier registration already took.
     /// </exception>
     private static IServiceCollection Register(
         this IServiceCollection services,
@@ -177,39 +180,82 @@ public static class MongoServiceCollectionExtensions
     {
         if (services.Registration(serviceKey) is { } first)
         {
-            if (AreDifferent(first.SectionName, sectionName))
-                throw new InvalidOperationException(
-                    $"MongoDB is already registered{Key(serviceKey)} from configuration section " +
-                    $"'{first.SectionName}', and this call names '{sectionName}'. One registration " +
-                    "serves one database; use AddKeyedMongodb with a distinct key for a second one.");
+            RefuseAnotherSection(first, serviceKey, sectionName);
 
             return services;
         }
 
-        services.Add(ServiceDescriptor.KeyedSingleton(serviceKey, new Registered(sectionName)));
+        services.AddSingleton(new MongoRegistration(serviceKey, sectionName));
+        services.AddSettings(serviceKey, configureOptions);
+        services.AddSetup(serviceKey, setup);
+        services.AddDriverTypes(serviceKey);
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, MongoStartup>());
 
+        return services;
+    }
+
+    private static void RefuseAnotherSection(MongoRegistration first, string? serviceKey, string? sectionName)
+    {
+        if (AreDifferent(first.SectionName, sectionName) is false)
+            return;
+
+        throw new InvalidOperationException(
+            $"MongoDB is already registered{Key(serviceKey)} from configuration section " +
+            $"'{first.SectionName}', and this call names '{sectionName}'. One registration " +
+            "serves one database; use AddKeyedMongodb with a distinct key for a second one.");
+    }
+
+    /// <summary>
+    /// Binds or configures the settings and has them validated when the host starts: present, then usable.
+    /// </summary>
+    private static void AddSettings(
+        this IServiceCollection services,
+        string? serviceKey,
+        Action<OptionsBuilder<MongoOptions>> configureOptions)
+    {
         var options = services.AddOptions<MongoOptions>(OptionsName(serviceKey));
         configureOptions(options);
-
-        options
-            .Validate(
-                o => string.IsNullOrWhiteSpace(o.Connection) || CanParse(o.Connection),
-                "Connection is not a connection string the MongoDB driver can parse.")
-            .Validate(
-                o => string.IsNullOrWhiteSpace(o.Database) || DatabaseNamespace.IsValid(o.Database),
-                "Database is not a legal MongoDB database name: it must not contain '.' or a null character.")
-            .ValidateOnStart();
+        options.ValidateOnStart();
 
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IValidateOptions<MongoOptions>>(MongoOptionsValidator.Instance));
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IValidateOptions<MongoOptions>>(MongoUsabilityValidator.Instance));
+    }
 
-        if (setup is not null)
-        {
-            services.AddOptions<MongoSetup>(OptionsName(serviceKey)).Configure(setup);
+    /// <summary>
+    /// Keeps the setup for the factories and registers its conventions now, before anything can serialise.
+    /// </summary>
+    /// <remarks>
+    /// Each key has a setup of its own, yet conventions land in one process-wide pack under the package's name,
+    /// and the driver's registry keeps the first pack under a name. A second registration whose pack name is
+    /// taken had its conventions dropped without a word — the audit database wrote <c>UserName</c> while its
+    /// registration asked for camel case — so it is refused, naming the pack.
+    /// </remarks>
+    private static void AddSetup(this IServiceCollection services, string? serviceKey, Action<MongoSetup>? setup)
+    {
+        if (setup is null)
+            return;
 
-            Mongo.ApplyConventions(Configured(setup));
-        }
+        services.AddOptions<MongoSetup>(OptionsName(serviceKey)).Configure(setup);
 
+        var configured = Configured(setup);
+
+        if (configured.Conventions is null || Mongo.TryApplyConventions(configured))
+            return;
+
+        throw new InvalidOperationException(
+            $"The conventions{Key(serviceKey)} were not registered: the pack name " +
+            $"'{configured.ConventionPackName}' is already taken by an earlier registration, and the driver's " +
+            "registry keeps the first pack under a name. Give this registration a ConventionPackName of its own.");
+    }
+
+    /// <summary>
+    /// The client, the configured database off it, and a bucket over that, each built once and only if nothing
+    /// else registered it.
+    /// </summary>
+    private static void AddDriverTypes(this IServiceCollection services, string? serviceKey)
+    {
         services.TryAdd(ServiceDescriptor.KeyedSingleton<IMongoClient>(
             serviceKey,
             (sp, key) => Mongo.Client(sp.Options(key), sp.Setup(key))));
@@ -220,24 +266,20 @@ public static class MongoServiceCollectionExtensions
 
         services.TryAdd(ServiceDescriptor.KeyedSingleton<IGridFSBucket>(
             serviceKey,
-            (sp, key) => Mongo.GridFs(
-                sp.GetRequiredKeyedService<IMongoDatabase>(key), sp.Setup(key))));
-
-        return services;
+            (sp, key) => Mongo.GridFs(sp.GetRequiredKeyedService<IMongoDatabase>(key), sp.Setup(key))));
     }
 
-    /// <summary>
-    /// Records that a key has been registered, and what it was registered from.
-    /// </summary>
-    private sealed record Registered(string? SectionName);
+    private static MongoRegistration? Registration(this IServiceCollection services, string? serviceKey)
+    {
+        foreach (var descriptor in services)
+        {
+            if (descriptor.ImplementationInstance is MongoRegistration registration
+                && Equals(registration.ServiceKey, serviceKey))
+                return registration;
+        }
 
-    private static Registered? Registration(this IServiceCollection services, string? serviceKey) =>
-        services.FirstOrDefault(d => d.ServiceType == typeof(Registered) && Equals(d.ServiceKey, serviceKey))
-            is { } descriptor
-            ? (descriptor.IsKeyedService
-                ? descriptor.KeyedImplementationInstance
-                : descriptor.ImplementationInstance) as Registered
-            : null;
+        return null;
+    }
 
     /// <summary>
     /// Two section names that name two databases. A call configuring settings by delegate names none,
@@ -250,29 +292,6 @@ public static class MongoServiceCollectionExtensions
 
     private static string Key(string? serviceKey) =>
         serviceKey is null ? string.Empty : $" under key '{serviceKey}'";
-
-    /// <summary>
-    /// Whether the driver can make a connection string of this.
-    /// </summary>
-    /// <remarks>
-    /// <c>[Required]</c> only asks whether the string is there. A present but unparseable one passed
-    /// validation, brought the host up, and surfaced from the first query instead — which is exactly
-    /// what validating at start-up is supposed to prevent. The driver exposes no non-throwing parse,
-    /// so this is the only way to ask.
-    /// </remarks>
-    private static bool CanParse(string connection)
-    {
-        try
-        {
-            MongoClientSettings.FromConnectionString(connection);
-
-            return true;
-        }
-        catch (MongoConfigurationException)
-        {
-            return false;
-        }
-    }
 
     /// <summary>
     /// The settings as the caller configured them, needed before the container can build them.

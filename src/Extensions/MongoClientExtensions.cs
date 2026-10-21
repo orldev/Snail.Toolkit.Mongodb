@@ -14,6 +14,10 @@ public static class MongoClientExtensions
     /// Pass the session on to every operation that must take part, for example
     /// <c>collection.InsertOneAsync(session, document, cancellationToken: ct)</c> — work that ignores
     /// the session is not part of the transaction.
+    ///
+    /// The driver starts a session and a transaction without asking the token, and a body that sends nothing
+    /// commits without a server, so a token cancelled before the call still ran the body once. The token is
+    /// asked here first.
     /// </remarks>
     /// <param name="client">The client.</param>
     /// <param name="body">The work to run. It may be invoked more than once.</param>
@@ -23,6 +27,7 @@ public static class MongoClientExtensions
     /// <typeparam name="TResult">The type of the result.</typeparam>
     /// <returns>A task whose result is what <paramref name="body"/> returned.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="client"/> or <paramref name="body"/> is null.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled before the body ran.</exception>
     public static async Task<TResult> InTransactionAsync<TResult>(
         this IMongoClient client,
         Func<IClientSessionHandle, CancellationToken, Task<TResult>> body,
@@ -32,6 +37,7 @@ public static class MongoClientExtensions
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(body);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var session = await client.StartSessionAsync(sessionOptions, cancellationToken)
             .ConfigureAwait(false);
