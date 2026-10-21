@@ -13,3 +13,5 @@ permissions:
 jobs:
   perf:
     uses: orldev/Snail.Sdk/.github/workflows/perf.yml@v1
+    with:
+      os: ubuntu-22.04

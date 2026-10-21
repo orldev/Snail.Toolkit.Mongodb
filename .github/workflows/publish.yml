@@ -18,6 +18,10 @@ on:
         type: boolean
         default: false
 
+# The tests start MongoDB in a container, and MongoDB stops on Linux kernels 6.19 through 7.0.13 (its TCMalloc); the
+# ubuntu-24.04 runner image moved to kernel 7.0.0 on 2026-10-18, while ubuntu-22.04 keeps 6.8. Back to ubuntu-latest
+# once that image reaches kernel 7.0.14.
+
 permissions:
   contents: read
 
@@ -25,6 +29,7 @@ jobs:
   release:
     uses: orldev/Snail.Sdk/.github/workflows/lib-publish.yml@v1
     with:
+      os: ubuntu-22.04
       version: ${{ inputs.version }}
       push: ${{ github.event_name == 'push' || inputs.push }}
     secrets: inherit

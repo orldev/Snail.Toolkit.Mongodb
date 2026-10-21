@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# The tests start MongoDB in a container, and MongoDB stops on Linux kernels 6.19 through 7.0.13 (its TCMalloc); the
+# ubuntu-24.04 runner image moved to kernel 7.0.0 on 2026-10-18, while ubuntu-22.04 keeps 6.8. Back to ubuntu-latest
+# once that image reaches kernel 7.0.14.
+
 jobs:
   ci:
     uses: orldev/Snail.Sdk/.github/workflows/lib-ci.yml@v1
+    with:
+      os: ubuntu-22.04
