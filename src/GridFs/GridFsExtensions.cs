@@ -5,7 +5,7 @@ namespace Snail.Toolkit.Mongodb.GridFs;
 /// content type in one call.
 /// </summary>
 /// <remarks>
-/// None of these take a session, and none can: <see cref="IGridFSBucket"/> in MongoDB.Driver 3.10
+/// None of these take a session, and none can: <see cref="IGridFSBucket"/> in MongoDB.Driver 3.13
 /// declares no overload of <c>FindAsync</c> or <c>OpenDownloadStreamAsync</c> that accepts one, so a
 /// GridFS read cannot join the transaction opened by <c>InTransactionAsync</c>. The aggregation
 /// helpers on <see cref="IMongoDatabase"/> can.

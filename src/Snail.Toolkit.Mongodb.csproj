@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <!-- Measured with a probe published with Native AOT: the driver itself warns and then fails. -->
-        <SnailNotNativeBecause>MongoDB.Driver and MongoDB.Bson 3.10 are not trim- or AOT-safe: a native publish warns IL2104 and IL3053 for both, and the BSON class maps fail at run time (MissingMethodException building a serializer).</SnailNotNativeBecause>
+        <SnailNotNativeBecause>MongoDB.Driver and MongoDB.Bson 3.13 are not trim- or AOT-safe: a native publish warns IL2104 and IL3053 for both, and the BSON class maps fail at run time (MissingMethodException building a serializer).</SnailNotNativeBecause>
         <PackageId>Snail.Toolkit.Mongodb</PackageId>
         <PackageTags>MongoDB, GridFS</PackageTags>
         <Title>Snail.Toolkit.Mongodb</Title>

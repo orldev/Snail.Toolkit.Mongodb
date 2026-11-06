@@ -276,7 +276,7 @@ authentication`. The check has to run something the server refuses to an unauthe
 ### Native AOT and trimming
 
 The library is **not** for a Native AOT or trimmed application, and does not declare itself so. The
-reason is its dependency rather than its own code: MongoDB.Driver and MongoDB.Bson 3.10 are not
+reason is its dependency rather than its own code: MongoDB.Driver and MongoDB.Bson 3.13 are not
 trim- or AOT-safe. A native publish of a probe over this library warns IL2104 and IL3053 for both
 assemblies, and the published executable then fails at run time — BSON class maps build serializers
 by reflection and end in a `MissingMethodException`. Suppressing those warnings would hide a crash,
